@@ -1,0 +1,2 @@
+COM sel_contourize,accuracy=0.25,break_to_islands=yes,clean_hole_size=3,\
+clean_hole_mode=x_and_y

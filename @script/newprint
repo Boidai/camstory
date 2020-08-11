@@ -1,0 +1,67 @@
+COM delete_layer,layer=stupy
+COM delete_layer,layer=sc
+COM delete_layer,layer=ss
+COM delete_layer,layer=int1
+COM delete_layer,layer=int2
+COM delete_layer,layer=int3
+COM delete_layer,layer=int4
+COM delete_layer,layer=int5
+COM delete_layer,layer=int6
+COM delete_layer,layer=et-c
+COM delete_layer,layer=et-s
+COM delete_layer,layer=gia-s
+COM delete_layer,layer=gvia-s
+COM delete_layer,layer=via-s
+COM delete_layer,layer=in
+COM delete_layer,layer=pin
+COM delete_layer,layer=p4
+COM matrix_refresh,job=$job,matrix=matrix
+
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_refresh,job=$job,matrix=matrix
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_refresh,job=$job,matrix=matrix
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+COM matrix_delete_row,job=$job,matrix=matrix,row=7
+
+
+
+
+COM affected_layer,name=silkc,mode=single,affected=yes
+COM affected_layer,name=silks,mode=single,affected=yes
+COM sel_delete
+COM affected_layer,name=cop,mode=single,affected=yes
+COM affected_layer,name=sod,mode=single,affected=yes
+COM affected_layer,name=drl,mode=single,affected=yes
+COM affected_layer,name=li,mode=single,affected=yes
+
+
+COM cur_atr_set,attribute=.out_flag,int=233
+COM snap_mode,mode=center
+

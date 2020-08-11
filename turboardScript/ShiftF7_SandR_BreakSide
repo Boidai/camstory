@@ -1,0 +1,1426 @@
+#!/bin/csh
+#排版及自動標示機構圖
+
+#region "暫存檔設定"
+set TMP = $GENESIS_DIR/tmp
+if ( ! -d "$GENESIS_DIR/tmp") then
+	mkdir "$GENESIS_DIR/tmp"	
+endif
+set info = $GENESIS_DIR/tmp/info
+set panelData = $GENESIS_DIR/sys/scripts/backData/panelData
+set gui_in = $TMP/gui_in
+set gui_out = $TMP/gui_out
+
+set angle = 0
+#endregion
+
+#region "取得Genesis的資料"
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+#檔案內容
+#set gNUM_ROWS = '30'
+#set gNUM_COLS = '5'
+#set gNUM_LAYERS = '14'
+#set gNUM_STEPS = '3'
+#set gROWrow        = ('1'           '2'           '3'        '4'        '5'        '6'        '7'        '8'        '9'           '10'          '11'       '12'       '13'       '14'       '15'    '16'    '17'    '18'    '19'    '20'    '21'    '22'    '23'    '24'    '25'    '26'    '27'    '28'    '29'    '30'   )
+#set gROWtype       = ('layer'       'layer'       'layer'    'layer'    'layer'    'layer'    'layer'    'layer'    'layer'       'layer'       'layer'    'layer'    'layer'    'layer'    'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty' 'empty')
+#set gROWname       = ('silkc'       'sc'          'cop'      'int1'     'int2'     'int3'     'int4'     'sod'      'ss'          'silks'       'drl'      'in'       'pin'      'li'       ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWcontext    = ('board'       'board'       'board'    'board'    'board'    'board'    'board'    'board'    'board'       'board'       'board'    'board'    'board'    'misc'     ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWlayer_type = ('silk_screen' 'solder_mask' 'signal'   'mixed'    'mixed'    'mixed'    'mixed'    'signal'   'solder_mask' 'silk_screen' 'drill'    'drill'    'drill'    'document' ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWpolarity   = ('positive'    'positive'    'positive' 'positive' 'positive' 'positive' 'positive' 'positive' 'positive'    'positive'    'positive' 'positive' 'positive' 'positive' ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWside       = ('top'         'top'         'top'      'inner'    'inner'    'inner'    'inner'    'bottom'   'bottom'      'bottom'      'none'     'none'     'none'     'none'     ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWdrl_start  = (''            ''            ''         ''         ''         ''         ''         ''         ''            ''            'silkc'    'silkc'    'silkc'    ''         ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWdrl_end    = (''            ''            ''         ''         ''         ''         ''         ''         ''            ''            'silks'    'silks'    'silks'    ''         ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWfoil_side  = ('none'        'none'        'top'      'top'      'bottom'   'top'      'bottom'   'bottom'   'none'        'none'        'none'     'none'     'none'     'none'     ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gROWsheet_side = ('none'        'none'        'top'      'bottom'   'top'      'bottom'   'top'      'bottom'   'none'        'none'        'none'     'none'     'none'     'none'     ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''      ''     )
+#set gCOLcol       = ('1'    '2'    '3'    '4'     '5'    )
+#set gCOLtype      = ('step' 'step' 'step' 'empty' 'empty')
+#set gCOLstep_name = ('org'  'pcs'  'wpnl' ''      ''     )
+#set gATTRname = ()
+#set gATTRval  = ()
+#endregion
+
+#region "判斷各step的Profile是否有做出來"
+set profile = 'NO'
+foreach no($gCOLcol)
+	if ($gCOLstep_name[$no] != "") then
+		COM info, out_file=$info,write_mode=replace,units=mm, \
+			args= -t step -e $JOB/$gCOLstep_name[$no] #-d PROF_LIMITS
+		source $info
+		\rm $info
+		#檔案內容
+		#set gPROF_LIMITSxmin = '0'
+		#set gPROF_LIMITSymin = '0'
+		#set gPROF_LIMITSxmax = '0'
+		#set gPROF_LIMITSymax = '0'		
+		
+		if ($gPROF_LIMITSxmax != $gPROF_LIMITSxmin || $gPROF_LIMITSymax != $gPROF_LIMITSymin) then
+			set profile = 'YES'
+		endif
+	endif	
+end
+
+#要先做Profile
+if ($profile == 'NO') then
+	PAUSE "Run Step/Profile set Size !"
+	goto EXIT
+endif
+#endregion
+
+#region "判斷symbol是否存在"
+if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_wpnl_w60") then
+	cp "$GENESIS_DIR/sys/scripts/backData/z_wpnl_w60" \
+		"$GENESIS_DIR/fw/lib/symbols/z_wpnl_w60"
+endif
+if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_wpnl_w61") then
+	cp "$GENESIS_DIR/sys/scripts/backData/z_wpnl_w60" \
+		"$GENESIS_DIR/fw/lib/symbols/z_wpnl_w61"
+endif
+#endregion
+
+#region "GUI視窗_基本資料"	
+echo "WIN 200 200" 					> $gui_in
+echo "CLABEL Continue the Script"	>>$gui_in
+echo "FONT tbi24"					>>$gui_in
+echo "FG 999999"					>>$gui_in
+echo "OPTION Step_Name SUB_STEP:"	>>$gui_in
+	foreach sb_step($gCOLstep_name)
+		if ($sb_step == 'org') then
+			set sb_step='choose_step?'
+		endif
+		echo "$sb_step"				>>$gui_in
+	end
+echo "END"							>>$gui_in
+echo "RADIO units 'Units :' : V 992222">>$gui_in
+echo "mm"						>>$gui_in
+echo "inch"					>>$gui_in
+echo "END"							>>$gui_in	
+
+echo "RADIO delete 'Delete Spnl :' : V 992222">>$gui_in
+echo "yes"						>>$gui_in
+echo "no"					>>$gui_in
+echo "END"							>>$gui_in
+
+echo "RADIO continue 'Continue ?' : V 992222">>$gui_in
+echo "Continue"						>>$gui_in
+echo "Exit Abort"					>>$gui_in
+echo "END"							>>$gui_in
+		
+gui $gui_in > $gui_out
+source $gui_out
+\rm $gui_out $gui_in	
+#endregion
+
+#region "判斷GUI參數"
+if ($continue == 2) then
+	goto EXIT
+endif
+if ($units == 1) then
+	set units = "mm"
+	set scaleSize = 1
+else
+	set units = "inch"
+	set scaleSize = 0.03937
+endif
+#刪除spnl , 再建立一個新的
+if ($delete == 1) then
+	foreach no($gCOLcol)
+		if ($gCOLstep_name[$no] == $STEP) then
+			set delNumStep = $no			
+		endif		
+	end
+	#刪除
+	COM matrix_delete_col,job=$JOB,matrix=matrix,col=$delNumStep
+	#插入
+	COM matrix_insert_col,job=$JOB,matrix=matrix,col=$delNumStep
+	#增加
+	COM matrix_add_step,job=$JOB,matrix=matrix,step=$STEP,col=$delNumStep
+	#顯示畫面
+	COM open_entity,job=$JOB,type=step,name=$STEP,iconic=no
+	COM units,type=$units
+endif
+#endregion
+
+#region "設定傳入EXE參數inputWordArray"
+set Sub_pnl = $gCOLstep_name[$Step_Name]
+COM info,out_file=$info,write_mode=replace,units=$units,args=-t step -e $JOB/$Sub_pnl -d PROF_LIMITS
+source $info
+\rm $info 
+#取得profile尺寸
+#set gPROF_LIMITSxmin = '0' 
+#set gPROF_LIMITSymin = '0' 
+#set gPROF_LIMITSxmax = '50'
+#set gPROF_LIMITSymax = '50'
+
+set inputWordArray = ($gPROF_LIMITSxmin $gPROF_LIMITSymin $gPROF_LIMITSxmax $gPROF_LIMITSymax $units)
+
+#endregion
+	
+
+if ( -f "$GENESIS_DIR/sys/scripts/backData/panelGUI.exe") then
+	#region "傳入參數=step的名稱及等待"
+	#exe程式內設定小數點最多2位
+	
+	panelGUI.exe $inputWordArray
+	
+	PAUSE "Wait Chinese GUI Input OK"
+	#endregion
+
+else	
+	#region "未完成********************"
+	#設定小數點2位
+	#set test=`echo "scale=2;5/3"|gbc`	
+	#PAUSE "OK"$test
+	#region "GUI 檔案內容"
+	#    "#光學點及Pin孔,座標(0,0)表示無此點",
+	#    "set panelOrigin_X =  " + panelOrigin_X,
+	#    "set panelOrigin_Y =  " + panelOrigin_Y,
+	#    "set nx = " + nx,
+	#    "set ny =  " + ny,
+	#    "set dx = " + dx,
+	#    "set dy = " + dy,                    
+	#    "set pnlSize_X = " + pnlSize_X,
+	#    "set pnlSize_Y = " + pnlSize_Y,
+    #    "set upBreak = " + upBreak,
+    #    "set downBreak = " + downBreak,
+    #    "set leftBreak = " + leftBreak,
+    #    "set rightBreak = " + rightBreak,
+	#    "set optical_Size = " + optical_Size,
+	#    "set optical_X1 = " + optical_X1,
+	#    "set optical_Y1 = " + optical_Y1,
+	#    "set optical_X2 = " + optical_X2,
+	#    "set optical_Y2 = " + optical_Y2,
+	#    "set optical_X3 = " + optical_X3,
+	#    "set optical_Y3 = " + optical_Y3,
+	#    "set optical_X4 = " + optical_X4,
+	#    "set optical_Y4 = " + optical_Y4,
+	#    "set drill_Size = " + drill_Size,
+	#    "set drill_X1 = " + drill_X1,
+	#    "set drill_Y1 = " + drill_Y1,
+	#    "set drill_X2 = " + drill_X2,
+	#    "set drill_Y2 = " + drill_Y2,
+	#    "set drill_X3 = " + drill_X3,
+	#    "set drill_Y3 = " + drill_Y3,
+	#    "set drill_X4 = " + drill_X4,
+	#    "set drill_Y4 = " + drill_Y4,
+	#    "set XVcutSum = " + XVcutSum,
+	#    "set YVcutSum = " + YVcutSum,
+	#	 "set xArray = (" + xArray + ")",
+	#	 "set yArray = (" + yArray + ")",
+    #    "set xSlot = (" + xSlot + ")",
+    #    "set ySlot = (" + ySlot + ")",	
+	#	 "set innerDotCu = " + innerDotCu,
+	#	 "set solderSize = " + solderSize
+	#endregion
+
+	goto EXIT
+	
+	#region "使用Genesis GUI介面"	
+	echo "WIN 100 100"					>  $gui_in
+	echo "FONT tbr24"					>> $gui_in
+	echo "LABEL F7_S&R Step"			>> $gui_in
+	echo "FONT tbr18"					>> $gui_in
+
+	#折斷邊尺寸
+	echo "TEXT upBreak    Top____Break_Edge_Size : "	>>$gui_in
+	echo "DTEXT upBreak 0"								>>$gui_in
+	echo "TEXT downBreak Bottom_Break_Edge_Size : "		>>$gui_in
+	echo "DTEXT downBreak 0"							>>$gui_in
+	echo "TEXT leftBreak   Left___Break_Edge_Size : "	>>$gui_in
+	echo "DTEXT leftBreak 0"							>>$gui_in
+	echo "TEXT rightBreak  Right__Break_Edge_Size : "	>>$gui_in
+	echo "DTEXT rightBreak 0"							>>$gui_in
+
+
+
+
+
+	
+	
+
+
+	gui $gui_in > $panelData
+	\rm $gui_in
+	#endregion
+#endregion
+
+endif
+
+if ( ! -f "$panelData") then
+	goto EXIT
+endif
+
+#取得來源檔
+source $panelData
+\rm $panelData
+set drillSizeMil = $drill_Size
+
+#排版
+COM affected_layer,name=,mode=all,affected=no
+COM units,type=$units
+COM sr_tab_add,line=1,step= $Sub_pnl,x=$panelOrigin_X,y=$panelOrigin_Y,\
+	nx=$nx,ny=$ny,dx=$dx,dy=$dy,angle=$angle,flip=no,mirror=no
+COM zoom_home
+
+#region "標示機構圖"
+#判斷層名是否存在
+set layerAutoLi = "No"
+set layerOrder = 0
+set layerLiNum = 0
+foreach no($gROWrow)	
+	if ($gROWname[$no] == "aotu_li") then
+		set layerAutoLi = "Yes"
+		set layerLiNum = `echo "$gROWrow[$no]" | gbc`
+	endif
+	if ($gROWname[$no] == "li") then
+		set layerOrder = `echo "$gROWrow[$no]" | gbc`			
+	endif
+end
+	
+#層名存在刪除
+if ($layerAutoLi == "Yes") then
+	COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$layerLiNum" | gbc`
+endif
+	
+#建立新的aotu_li
+set buf = `echo "$layerOrder + 1" | gbc`
+COM matrix_insert_row,job=$JOB,matrix=matrix,row=$buf
+COM matrix_add_layer,job=$JOB,matrix=matrix,layer=aotu_li,row=$buf,\
+	context=misc,type=document,polarity=positive
+		
+#複製li內容到aotu_li
+#待確認,由使用者決定如何複製
+#if ($layerLiNum != "0") then
+#	COM display_layer,name=li,display=yes,number=1
+#	COM work_layer,name=li
+#	COM sel_copy_other,dest=layer_name,target_layer=auto_li,invert=no,dx=0,dy=0,size=0
+#endif
+	
+#開始畫排版及標示機構圖	
+COM display_layer,name=aotu_li,display=yes,number=1
+COM work_layer,name=aotu_li
+
+#region "折斷邊 pnlSize_X  pnlSize_Y"
+if ($units == "mm") then
+	set sym = "r254"
+	set V_CutLine = "r241.3"
+else
+	set sym = "r10"
+	set V_CutLine = "r9.5"
+endif
+#region "上折斷邊"
+if (`echo "$upBreak > 0" | gbc`) then
+	#畫4條線
+	set xs = `echo "0" | gbc`
+	set ys = `echo "$pnlSize_Y - $upBreak" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$pnlSize_Y - $upBreak" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	set xs = `echo "0" | gbc`
+	set ys = `echo "$pnlSize_Y" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+		
+	set xs = `echo "0" | gbc`
+	set ys = `echo "$pnlSize_Y - $upBreak" | gbc`
+	set xe = `echo "0" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	set xs = `echo "$pnlSize_X" | gbc`
+	set ys = `echo "$pnlSize_Y - $upBreak" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`	
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	#畫V_Cut線
+	set i = 2
+	while (`echo "$i < $XVcutSum" | gbc`)
+		set xs = $xArray[$i]
+		set ys = `echo "$pnlSize_Y" | gbc`
+		set xe = $xArray[$i]
+		set ye = `echo "$pnlSize_Y - $upBreak" | gbc`
+		COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+			symbol=$V_CutLine,polarity=positive
+		@ i ++
+	end
+
+endif
+#endregion
+
+#region "下折斷邊"
+if (`echo "$downBreak > 0" | gbc`) then
+	#畫4條線
+	set xs = `echo "0" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "0" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+		
+	set xs = `echo "0" | gbc`
+	set ys = `echo "$downBreak" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$downBreak" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+		
+	set xs = `echo "0" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "0" | gbc`
+	set ye = `echo "$downBreak" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	set xs = `echo "$pnlSize_X" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$downBreak" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	#畫V_Cut線
+	set i = 2
+	while (`echo "$i < $XVcutSum" | gbc`)
+		set xs = $xArray[$i]
+		set ys = 0
+		set xe = $xArray[$i]
+		set ye = $downBreak
+		COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+			symbol=$V_CutLine,polarity=positive
+		@ i ++
+	end
+endif
+#endregion	
+
+#region "左折斷邊"
+if (`echo "$leftBreak > 0" | gbc`) then
+	#畫4條線
+	set xs = `echo "0" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$leftBreak" | gbc`
+	set ye = `echo "0" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+		
+	set xs = `echo "0" | gbc`
+	set ys = `echo "$pnlSize_Y" | gbc`
+	set xe = `echo "$leftBreak" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	set xs = `echo "0" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "0" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	set xs = `echo "$leftBreak" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$leftBreak" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+	
+	#畫V_Cut線
+	set i = 2
+	while (`echo "$i < $YVcutSum" | gbc`)
+		set xs = 0
+		set ys = $yArray[$i]
+		set xe = $leftBreak
+		set ye = $yArray[$i]
+		COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+			symbol=$V_CutLine,polarity=positive
+		@ i ++
+	end	
+endif
+#endregion	
+
+#region "右折斷邊"
+if (`echo "$rightBreak > 0" | gbc`) then
+	#畫4條線
+	set xs = `echo "$pnlSize_X - $rightBreak" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "0" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	set xs = `echo "$pnlSize_X - $rightBreak" | gbc`
+	set ys = `echo "$pnlSize_Y" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	set xs = `echo "$pnlSize_X - $rightBreak" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$pnlSize_X - $rightBreak" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	set xs = `echo "$pnlSize_X" | gbc`
+	set ys = `echo "0" | gbc`
+	set xe = `echo "$pnlSize_X" | gbc`
+	set ye = `echo "$pnlSize_Y" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,symbol=$sym,polarity=positive
+
+	#畫V_Cut線
+	set i = 2
+	while (`echo "$i < $YVcutSum" | gbc`)
+		set xs = `echo "$pnlSize_X" | gbc`
+		set ys = $yArray[$i]
+		set xe = `echo "$pnlSize_X - $rightBreak" | gbc`
+		set ye = $yArray[$i]
+		COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+			symbol=$V_CutLine,polarity=positive
+		@ i ++
+	end	
+endif
+#endregion
+#endregion
+	
+#region "鑽孔4孔"
+#光學點及Pin孔,座標(0,0)表示無此點	
+#set drill_Size
+if ($units == "mm") then	
+	set drill_Size = `echo "$drill_Size * 25.4" | gbc`
+endif
+
+#鑽孔1(左上)
+if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+	COM add_pad,attributes=no,x=$drill_X1,y=$drill_Y1,\
+		symbol=r$drill_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif
+
+#鑽孔2(左下)
+if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+	COM add_pad,attributes=no,x=$drill_X2,y=$drill_Y2,\
+		symbol=r$drill_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif	
+
+#鑽孔3(右上)
+if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+	COM add_pad,attributes=no,x=$drill_X3,y=$drill_Y3,\
+		symbol=r$drill_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif
+
+#鑽孔4(右下)	
+if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+	COM add_pad,attributes=no,x=$drill_X4,y=$drill_Y4,\
+		symbol=r$drill_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif
+#endregion
+	
+#region "光學點4點"	
+#光學點及Pin孔,座標(0,0)表示無此點
+#set optical_Size
+#光學點1(左上)
+if (`echo "$optical_X1 > 0 && $optical_Y1 < $pnlSize_Y" | gbc`) then
+	COM add_pad,attributes=no,x=$optical_X1,y=$optical_Y1,\
+		symbol=r$optical_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+endif	
+
+#光學點2(左下)
+if (`echo "$optical_X2 > 0 && $optical_Y2 > 0" | gbc`) then
+	COM add_pad,attributes=no,x=$optical_X2,y=$optical_Y2,\
+		symbol=r$optical_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif
+
+#光學點3(右上)	
+if (`echo "$optical_X3 < $pnlSize_X && $optical_Y3 < $pnlSize_Y" | gbc`) then
+	COM add_pad,attributes=no,x=$optical_X3,y=$optical_Y3,\
+		symbol=r$optical_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif
+
+#光學點4(右下)		
+if (`echo "$optical_X4 < $pnlSize_X && $optical_Y4 > 0" | gbc`) then
+	COM add_pad,attributes=no,x=$optical_X4,y=$optical_Y4,\
+		symbol=r$optical_Size,polarity=positive,angle=0,\
+		mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+endif	
+#endregion
+
+
+#region "標示尺寸"
+#set XVcutSum
+#set YVcutSum
+#set xArray = (xArray)
+#set yArray = (yArray)
+
+#region "判斷文字尺寸wordSize"
+if (`echo "$pnlSize_X > $pnlSize_Y" | gbc`) then
+	set buf = `echo "$pnlSize_Y / $scaleSize" | gbc`
+else
+	set buf = `echo "$pnlSize_X / $scaleSize" | gbc`
+endif
+
+if (`echo "$buf > 250" | gbc`) then
+	if ($units == "mm") then
+		set wordSize = 5.08
+	else
+		set wordSize = 0.2
+	endif
+	set wordWidth = 1.25
+else if (`echo "$buf > 60" | gbc`) then
+	if ($units == "mm") then
+		set wordSize = 3.048
+	else
+		set wordSize = 0.12
+	endif
+	set wordWidth = 1.0
+else
+	if ($units == "mm") then
+		set wordSize = 2.032
+	else
+		set wordSize = 0.08
+	endif
+	set wordWidth = 0.833
+endif
+#endregion	
+
+#region "標示X方向"
+set i = 1
+set buf = 1
+if ($units == "mm") then
+	set sym = "tri2540x2540"
+	set line = "r228.6"
+else
+	set sym = "tri100x100"
+	set line = "r9"
+endif
+while (`echo "$i < $XVcutSum + 1" | gbc`)	
+	#三角形箭頭(xy是中心點)
+	set xs = $xArray[$i]
+	set ys = `echo "-2.540 * $scaleSize" | gbc`
+	
+	COM add_pad,attributes=no,x=$xs,y=$ys,symbol=$sym,polarity=positive,\
+		angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+	
+	#引申線,要判斷前一個間距,是否加長引線	
+	set buff = `echo "$i - 1" | gbc`
+	if (`echo "($xArray[$i] - $xArray[$buff]) < (6 * $scaleSize) && $buf < 1" | gbc`) then
+		set ye = `echo "$ys - (15 * $scaleSize)" | gbc`
+		set buf = 1
+	else
+		set ye = `echo "$ys - (5 * $scaleSize)" | gbc`
+		set buf = 0
+	endif
+	set xe = `echo "$xs" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+		symbol=$line,polarity=positive		
+	
+	#尺寸文字
+	set xs = `echo "$xArray[$i] - (1.3 * $scaleSize)" | gbc`
+	set ys = `echo "$ye - (3 * $scaleSize)" | gbc`
+	if ($units == "mm") then
+		set wordText = `echo "$xArray[$i]" | gbc`
+	else
+		set wordText = `echo "scale=2;$xArray[$i]/0.03937" | gbc`
+	endif
+	
+	COM add_text,attributes=no,type=string,x=$xs,y=$ys,text=$wordText,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=90,mirror=no,fontname=standard	
+	
+	@ i ++
+end	
+#endregion	
+
+#region "標示Y方向"
+set i = 1
+set buf = 1
+while (`echo "$i < $YVcutSum + 1" | gbc`)		
+	#三角形箭頭(xy是中心點)
+	set xs = `echo "$pnlSize_X + (2.540 * $scaleSize)" | gbc`
+	set ys = `echo "$yArray[$i]" | gbc`
+	COM add_pad,attributes=no,x=$xs,y=$ys,symbol=$sym,polarity=positive,\
+		angle=270,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+
+	#引申線,要判斷前一個間距,是否加長引線
+	set buff = `echo "$i - 1" | gbc`
+	if (`echo "($yArray[$i] - $yArray[$buff]) < (6 * $scaleSize) && $buf < 1" | gbc`) then
+		set xe = `echo "$xs + (15 * $scaleSize)" | gbc`
+		set buf = 1
+	else
+		set xe = `echo "$xs + (5 * $scaleSize)" | gbc`
+		set buf = 0
+	endif
+	set ye = `echo "$ys" | gbc`
+	COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+		symbol=$line,polarity=positive
+		
+	#尺寸文字
+	set xs = `echo "$xe + (3 * $scaleSize)" | gbc`
+	set ys = `echo "$yArray[$i] - (1.3 * $scaleSize)" | gbc`
+	if ($units == "mm") then
+		set wordText = `echo "$yArray[$i]" | gbc`
+	else
+		set wordText = `echo "scale=2;$yArray[$i]/0.03937" | gbc`
+	endif
+	COM add_text,attributes=no,type=string,x=$xs,y=$ys,text=$wordText,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=0,mirror=no,fontname=standard	
+
+	@ i ++
+end	
+#endregion		
+
+#region "標示PIN座標"
+#鑽孔1(左上)
+if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+	if ($units == "mm") then
+		set word="("$drill_X1";"$drill_Y1")"
+	else
+		set drill_X1_buf = `echo "scale=2;$drill_X1/0.03937" | gbc`
+		set drill_Y1_buf = `echo "scale=2;$drill_Y1/0.03937" | gbc`
+		set word="("$drill_X1_buf";"$drill_Y1_buf")"
+	endif	
+	set buf = `echo "$drill_X1 + (7 * $scaleSize)" | gbc`
+	set buff = `echo "$drill_Y1 - (1.3 * $scaleSize)" | gbc`
+	COM add_text,attributes=no,type=string,\
+		x=$buf,\
+		y=$buff,\
+		text=$word,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=0,mirror=no,fontname=standard	
+endif
+
+#鑽孔2(左下)
+if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+	if ($units == "mm") then
+		set word="("$drill_X2";"$drill_Y2")"
+	else
+		set drill_X1_buf = `echo "scale=2;$drill_X2/0.03937" | gbc`
+		set drill_Y1_buf = `echo "scale=2;$drill_Y2/0.03937" | gbc`
+		set word="("$drill_X1_buf";"$drill_Y1_buf")"
+	endif
+
+	set buf = `echo "$drill_X2 + (7 * $scaleSize)" | gbc`
+	set buff = `echo "$drill_Y2 - (1.3 * $scaleSize)" | gbc`
+	COM add_text,attributes=no,type=string,\
+		x=$buf,\
+		y=$buff,\
+		text=$word,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=0,mirror=no,fontname=standard
+endif	
+
+#鑽孔3(右上)
+if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+	if ($units == "mm") then
+		set word="("$drill_X3";"$drill_Y3")"
+	else
+		set drill_X1_buf = `echo "scale=2;$drill_X3/0.03937" | gbc`
+		set drill_Y1_buf = `echo "scale=2;$drill_Y3/0.03937" | gbc`
+		set word="("$drill_X1_buf";"$drill_Y1_buf")"
+	endif
+
+	set buf = `echo "$drill_X3 + (7 * $scaleSize)" | gbc`
+	set buff = `echo "$drill_Y3 - (1.3 * $scaleSize)" | gbc`	
+	COM add_text,attributes=no,type=string,\
+		x=$buf,\
+		y=$buff,\
+		text=$word,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=0,mirror=no,fontname=standard
+endif
+
+#鑽孔4(右下)	
+if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+	if ($units == "mm") then
+		set word="("$drill_X4";"$drill_Y4")"
+	else
+		set drill_X1_buf = `echo "scale=2;$drill_X4/0.03937" | gbc`
+		set drill_Y1_buf = `echo "scale=2;$drill_Y4/0.03937" | gbc`
+		set word="("$drill_X1_buf";"$drill_Y1_buf")"
+	endif
+
+	set buf = `echo "$drill_X4 + (7 * $scaleSize)" | gbc`
+	set buff = `echo "$drill_Y4 - (1.3 * $scaleSize)" | gbc`
+	COM add_text,attributes=no,type=string,\
+		x=$buf,\
+		y=$buff,\
+		text=$word,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+		polarity=positive,angle=0,mirror=no,fontname=standard
+endif		
+#endregion
+
+#region "使用mouse增加料號及PNL尺寸"
+COM zoom_home
+MOUSE p Add JOB_Name and PNL_Size Position
+set feature = ( $MOUSEANS )
+set MouseX = $feature[1]
+set MouseY = $feature[2]
+set unitText = "$JOB  $pnlSize_X x $pnlSize_Y $units"
+COM add_text,attributes=no,type=string,x=$MouseX,y=$MouseY,text=$unitText,\
+	x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,polarity=positive,\
+	angle=0,mirror=no,fontname=standard	
+#COM sel_break
+	
+#endregion
+#endregion
+
+
+#endregion	
+
+#製作每一層增加的物件(Board)
+set intMirror = 1
+foreach no($gROWrow)		
+	if ($gROWcontext[$no] == "board" && $gROWlayer_type[$no] != "silk_screen") then
+		#需工作的層別
+		COM display_layer,name=$gROWname[$no],display=yes,number=1
+		COM work_layer,name=$gROWname[$no]
+		
+		#region "1.折斷邊(SLOT)先增加負性的銅皮銅面,線路層(含內層)"
+		#pnlSize_X pnlSize_Y
+		if ($gROWlayer_type[$no] == 'mixed' || $gROWlayer_type[$no] == 'power_ground' \
+				|| $gROWlayer_type[$no] == 'signal') then
+			if ($units == "mm") then			
+				COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,\
+				use_arcs=yes,symbol=,dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,\
+				outline_draw=no,outline_width=0,outline_invert=no
+			else
+				COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=1,\
+					use_arcs=yes,symbol=,dx=0.1,dy=0.1,break_partial=yes,cut_prims=no,outline_draw=no,\
+					outline_width=0,outline_invert=no
+			endif	
+			#region "上折斷邊"
+			if (`echo "$upBreak > 0" | gbc`) then
+				set x1 = `echo "0" | gbc`
+				set y1 = `echo "$pnlSize_Y - $upBreak" | gbc`
+				set x2 = `echo "$pnlSize_X" | gbc`
+				set y2 = `echo "$pnlSize_Y" | gbc`				
+				COM add_surf_strt
+				COM add_surf_poly_strt,x=$x1,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y1
+				COM add_surf_poly_end
+				COM add_surf_end,attributes=no,polarity=negative
+			endif
+			#endregion
+
+			#region "下折斷邊"
+			if (`echo "$downBreak > 0" | gbc`) then
+				set x1 = `echo "0" | gbc`
+				set y1 = `echo "0" | gbc`
+				set x2 = `echo "$pnlSize_X" | gbc`
+				set y2 = `echo "$downBreak" | gbc`				
+				COM add_surf_strt
+				COM add_surf_poly_strt,x=$x1,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y1
+				COM add_surf_poly_end
+				COM add_surf_end,attributes=no,polarity=negative
+			endif	
+			#endregion
+			
+			#region "左折斷邊"
+			if (`echo "$leftBreak > 0" | gbc`) then
+				set x1 = `echo "0" | gbc`
+				set y1 = `echo "0" | gbc`
+				set x2 = `echo "$leftBreak" | gbc`
+				set y2 = `echo "$pnlSize_Y" | gbc`				
+				COM add_surf_strt
+				COM add_surf_poly_strt,x=$x1,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y1
+				COM add_surf_poly_end
+				COM add_surf_end,attributes=no,polarity=negative
+			endif	
+			#endregion
+			
+			#region "右折斷邊"
+			if (`echo "$rightBreak > 0" | gbc`) then
+				set x1 = `echo "$pnlSize_X - $rightBreak" | gbc`
+				set y1 = `echo "0" | gbc`
+				set x2 = `echo "$pnlSize_X" | gbc`
+				set y2 = `echo "$pnlSize_Y" | gbc`			
+				COM add_surf_strt
+				COM add_surf_poly_strt,x=$x1,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y2
+				COM add_surf_poly_seg,x=$x2,y=$y1
+				COM add_surf_poly_seg,x=$x1,y=$y1
+				COM add_surf_poly_end
+				COM add_surf_end,attributes=no,polarity=negative		
+			endif				
+			#endregion		
+
+			#region "排版間距加上負性銅面"
+			#X方向
+			set i = 1
+			while (`echo "$i < $XVcutSum + 1" | gbc`)	
+				if ($xSlot[$i] == 1) then
+					#間距左邊
+					set buf = `echo "$i - 1" | gbc`
+					set lineRadius = `echo "($xArray[$i] - $xArray[$buf]) * 0.5" | gbc`
+					set line = s`echo "($xArray[$i] - $xArray[$buf]) * 1000" | gbc`					
+					set xs = `echo "$xArray[$i] - $lineRadius" | gbc`
+					set ys = `echo "$downBreak + $lineRadius" | gbc`
+					set xe = $xs
+					set ye = `echo "$pnlSize_Y - $upBreak - $lineRadius" | gbc`
+					COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+						symbol=$line,polarity=negative
+					
+				endif
+
+				@ i ++
+			end	
+			
+			#Y方向
+			set i = 1
+			while (`echo "$i < $YVcutSum + 1" | gbc`)	
+				if ($ySlot[$i] == 1) then
+					#間距上邊
+					set buf = `echo "$i - 1" | gbc`
+					set lineRadius = `echo "($yArray[$i] - $yArray[$buf]) * 0.5" | gbc`
+					set line = s`echo "($yArray[$i] - $yArray[$buf]) * 1000" | gbc`					
+					set xs = `echo "$leftBreak + $lineRadius" | gbc`
+					set ys = `echo "$yArray[$i] - $lineRadius" | gbc`
+					set xe = `echo "$pnlSize_X - $rightBreak - $lineRadius" | gbc`
+					set ye = $ys
+					COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+						symbol=$line,polarity=negative				
+				endif
+				@ i ++
+			end				
+			
+			#endregion
+		endif
+		#endregion
+
+		#region "2.折斷邊增加正性的銅皮銅面"
+		if ($gROWside[$no] != 'inner') then
+			#外層,要錯開V_Cut線
+			set w601 = "no"
+		else
+			#內層
+			if ($innerDotCu == "Dot") then
+				if (`echo "$intMirror % 2 == 1" | gbc`) then
+					set w601='z_wpnl_w60'
+				else
+					set w601='z_wpnl_w61'
+				endif			
+			else if ($innerDotCu == "Cu") then
+				set w601 = "no"
+			else
+				goto Next
+			endif
+		endif
+		
+		#排除不須增加折斷邊銅面層別
+		if ($gROWlayer_type[$no] == "drill" || $gROWlayer_type[$no] == "solder_mask") then
+			goto Next
+		endif
+		
+		if ($units == "mm") then
+			set min_brush = 25.4
+			set sym = "s1000"
+		else
+			set min_brush = 1
+			set sym = "s39.37"
+		endif
+		set dx = `echo "scale=3;3.048 * $scaleSize" | gbc`
+		if ($w601 == "no") then			
+			COM fill_params,type=solid,origin_type=datum,solid_type=surface,\
+				min_brush=$min_brush,use_arcs=yes,symbol=,dx=$dx,dy=$dx,\
+				break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,\
+				outline_invert=no		
+		else			
+			COM fill_params,type=pattern,origin_type=datum,solid_type=surface,min_brush=$min_brush,\
+				use_arcs=yes,symbol=$w601,dx=$dx,dy=$dx,break_partial=yes,\
+				cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no		
+		endif
+			
+		set intMirror = `echo "$intMirror + 1" | gbc`
+		
+		#region "上折斷邊"
+		#Up
+		if (`echo "$upBreak > 0" | gbc`) then
+			set x1 = `echo "1 * $scaleSize" | gbc`
+			set y1 = `echo "$pnlSize_Y - $upBreak + (1 * $scaleSize)" | gbc`
+			set x2 = `echo "$pnlSize_X - (1 * $scaleSize)" | gbc`
+			set y2 = `echo "$pnlSize_Y - (1 * $scaleSize)" | gbc`				
+			COM add_surf_strt
+			COM add_surf_poly_strt,x=$x1,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y1
+			COM add_surf_poly_end
+			COM add_surf_end,attributes=no,polarity=positive
+			
+			#外層,要錯開V_Cut線(負性線S1000)
+			if (`echo "$XVcutSum > 2" | gbc`) then	
+				set n = 1
+				foreach m($xArray)			
+					#第一個與最後一個不畫負線						
+					if (`echo "$n > 1 && $n < $XVcutSum" | gbc`) then
+						set xs = `echo "$m" | gbc`
+						set ys = `echo "$pnlSize_Y -$upBreak + (1 * $scaleSize)" | gbc`
+						set xe = `echo "$m" | gbc`
+						set ye = `echo "$pnlSize_Y - (1 * $scaleSize)" | gbc`						
+						if ($gROWside[$no] == "inner" && $innerDotCu == "Dot") then	
+							#刪除阻膠豆
+							COM filter_area_strt
+							COM filter_area_xy,x=$xs,y=$ys
+							COM filter_area_xy,x=$xe,y=$ye
+							COM filter_area_end,layer=,filter_name=popup,operation=select,\
+								area_type=rectangle,inside_area=yes,intersect_area=yes,\
+								lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+								min_angle=0,max_angle=0
+							COM sel_delete									
+						else
+							#畫負性線
+							COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+								symbol=$sym,polarity=negative							
+						endif						
+					endif
+					set n = `echo "$n + 1" | gbc`
+				end
+			endif
+		endif
+		#endregion
+
+		#region "下折斷邊"
+		#Down
+		if (`echo "$downBreak > 0" | gbc`) then
+			set x1 = `echo "1 * $scaleSize" | gbc`
+			set y1 = `echo "1 * $scaleSize" | gbc`
+			set x2 = `echo "$pnlSize_X - (1 * $scaleSize)" | gbc`
+			set y2 = `echo "$downBreak - (1 * $scaleSize)" | gbc`				
+			COM add_surf_strt
+			COM add_surf_poly_strt,x=$x1,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y1
+			COM add_surf_poly_end
+			COM add_surf_end,attributes=no,polarity=positive
+			
+			#外層,要錯開V_Cut線(負性線S1000)
+			if (`echo "$XVcutSum > 2" | gbc`) then
+				set n = 1
+				foreach m($xArray)
+				#第一個與最後一個不畫負線
+					if (`echo "$n > 1 && $n < $XVcutSum" | gbc`) then
+						set xs = `echo "$m" | gbc`
+						set ys = `echo "1 * $scaleSize" | gbc`
+						set xe = `echo "$m" | gbc`
+						set ye = `echo "$downBreak - (1 * $scaleSize)" | gbc`
+						
+						if ($gROWside[$no] == "inner" && $innerDotCu == "Dot") then	
+							#刪除阻膠豆
+							COM filter_area_strt
+							COM filter_area_xy,x=$xs,y=$ys
+							COM filter_area_xy,x=$xe,y=$ye
+							COM filter_area_end,layer=,filter_name=popup,operation=select,\
+								area_type=rectangle,inside_area=yes,intersect_area=yes,\
+								lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+								min_angle=0,max_angle=0
+							COM sel_delete									
+						else
+							#畫負性線
+							COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+								symbol=$sym,polarity=negative							
+						endif
+					endif
+					set n = `echo "$n + 1" | gbc`
+				end				
+			endif
+		
+		endif	
+		#endregion
+			
+		#region "左折斷邊"
+		#Left
+		if (`echo "$leftBreak > 0" | gbc`) then		
+			set x1 = `echo "1 * $scaleSize" | gbc`
+			set y1 = `echo "1 * $scaleSize" | gbc`
+			set x2 = `echo "$leftBreak - (1 * $scaleSize)" | gbc`
+			set y2 = `echo "$pnlSize_Y - (1 * $scaleSize)" | gbc`				
+			COM add_surf_strt
+			COM add_surf_poly_strt,x=$x1,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y1
+			COM add_surf_poly_end
+			COM add_surf_end,attributes=no,polarity=positive
+			
+			#外層,要錯開V_Cut線(負性線S1000)
+			if (`echo "$YVcutSum > 2" | gbc`) then
+				set n = 1
+				foreach m($yArray)
+					#第一個與最後一個不畫負線
+					if (`echo "$n > 1 && $n < $YVcutSum" | gbc`) then
+						set xs = `echo "1 * $scaleSize" | gbc`
+						set ys = `echo "$m" | gbc`
+						set xe = `echo "$leftBreak - (1 * $scaleSize)" | gbc`
+						set ye = `echo "$m" | gbc`			
+						if ($gROWside[$no] == "inner" && $innerDotCu == "Dot") then	
+							#刪除阻膠豆
+							COM filter_area_strt
+							COM filter_area_xy,x=$xs,y=$ys
+							COM filter_area_xy,x=$xe,y=$ye
+							COM filter_area_end,layer=,filter_name=popup,operation=select,\
+								area_type=rectangle,inside_area=yes,intersect_area=yes,\
+								lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+								min_angle=0,max_angle=0
+							COM sel_delete									
+						else
+							#畫負性線
+							COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+								symbol=$sym,polarity=negative							
+						endif
+					endif
+					set n = `echo "$n + 1" | gbc`
+				end
+			endif					
+		endif	
+		#endregion
+			
+		#region "右折斷邊"
+		#Right
+		if (`echo "$rightBreak > 0" | gbc`) then
+			set x1 = `echo "$pnlSize_X - $rightBreak + (1 * $scaleSize)" | gbc`
+			set y1 = `echo "1 * $scaleSize" | gbc`
+			set x2 = `echo "$pnlSize_X - (1 * $scaleSize)" | gbc`
+			set y2 = `echo "$pnlSize_Y - (1 * $scaleSize)" | gbc`				
+			COM add_surf_strt
+			COM add_surf_poly_strt,x=$x1,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y2
+			COM add_surf_poly_seg,x=$x2,y=$y1
+			COM add_surf_poly_seg,x=$x1,y=$y1
+			COM add_surf_poly_end
+			COM add_surf_end,attributes=no,polarity=positive	
+
+			#外層,要錯開V_Cut線(負性線S1000)
+			if (`echo "$YVcutSum > 2" | gbc`) then
+				set n = 1
+				foreach m($yArray)
+					#第一個與最後一個不畫負線
+					if (`echo "$n > 1 && $n < $YVcutSum" | gbc`) then
+						set xs = `echo "$pnlSize_X - $rightBreak + (1 * $scaleSize)" | gbc`
+						set ys = `echo "$m" | gbc`
+						set xe = `echo "$pnlSize_X - (1 * $scaleSize)" | gbc`
+						set ye = `echo "$m" | gbc`		
+						if ($gROWside[$no] == "inner" && $innerDotCu == "Dot") then	
+							#刪除阻膠豆
+							COM filter_area_strt
+							COM filter_area_xy,x=$xs,y=$ys
+							COM filter_area_xy,x=$xe,y=$ye
+							COM filter_area_end,layer=,filter_name=popup,operation=select,\
+								area_type=rectangle,inside_area=yes,intersect_area=yes,\
+								lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+								min_angle=0,max_angle=0
+							COM sel_delete									
+						else
+							#畫負性線
+							COM add_line,attributes=no,xs=$xs,ys=$ys,xe=$xe,ye=$ye,\
+								symbol=$sym,polarity=negative							
+						endif
+					endif
+					set n = `echo "$n + 1" | gbc`
+				end
+			endif				
+		endif				
+		#endregion		
+Next:
+
+		#endregion
+
+		#region "3.增加鑽孔位置"	
+		#drl=128 sc=140(+12mil(304.8)) 負Pad=164(+18mil(457.2))
+		#region "鑽孔層,使用英制單位增加"
+		if ($gROWlayer_type[$no] == 'drill' && $gROWname[$no] == 'drl') then
+			COM units,type=inch
+			if ($units == "mm") then
+				set drill_X1_buf = `echo "$drill_X1 * 0.03937" | gbc`
+				set drill_Y1_buf = `echo "$drill_Y1 * 0.03937" | gbc`
+				set drill_X2_buf = `echo "$drill_X2 * 0.03937" | gbc`
+				set drill_Y2_buf = `echo "$drill_Y2 * 0.03937" | gbc`
+				set drill_X3_buf = `echo "$drill_X3 * 0.03937" | gbc`
+				set drill_Y3_buf = `echo "$drill_Y3 * 0.03937" | gbc`
+				set drill_X4_buf = `echo "$drill_X4 * 0.03937" | gbc`
+				set drill_Y4_buf = `echo "$drill_Y4 * 0.03937" | gbc`				
+			endif
+			#鑽孔1(左上)			
+			if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X1_buf,y=$drill_Y1_buf,\
+					symbol=r$drillSizeMil,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			#鑽孔2(左下)
+			if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X2_buf,y=$drill_Y2_buf,\
+					symbol=r$drillSizeMil,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif	
+			#鑽孔3(右上)
+			if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+			COM add_pad,attributes=no,x=$drill_X3_buf,y=$drill_Y3_buf,\
+					symbol=r$drillSizeMil,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			#鑽孔4(右下)	
+			if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+			COM add_pad,attributes=no,x=$drill_X4_buf,y=$drill_Y4_buf,\
+					symbol=r$drillSizeMil,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			COM units,type=$units
+		endif
+		#endregion
+	
+		#region "防焊層"
+		if ($gROWlayer_type[$no] == 'solder_mask') then
+			#鑽孔1(左上)
+			set buf = r`echo "$drill_Size + (304.8 * $scaleSize)" | gbc`
+			if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X1,y=$drill_Y1,\
+					symbol=$buf,\
+					polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			#鑽孔2(左下)
+			if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X2,y=$drill_Y2,\
+					symbol=$buf,\
+					polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif	
+			#鑽孔3(右上)
+			if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X3,y=$drill_Y3,\
+					symbol=$buf,\
+					polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			#鑽孔4(右下)	
+			if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$drill_X4,y=$drill_Y4,\
+					symbol=$buf,\
+					polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif	
+		endif
+		#endregion
+		
+		#region "線路層(含內層)"
+		if ($gROWlayer_type[$no] == 'mixed' || $gROWlayer_type[$no] == 'power_ground' \
+				|| $gROWlayer_type[$no] == 'signal') then
+			if ($gROWside[$no] == "inner" && $innerDotCu == "Dot") then			
+				#region "刪除阻膠豆"
+				#鑽孔1(左上)				
+				if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+				
+					set xs = `echo "$drill_X1 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ys = `echo "$drill_Y1 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set xe = `echo "$drill_X1 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ye = `echo "$drill_Y1 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					COM filter_area_strt
+					COM filter_area_xy,x=$xs,y=$ys
+					COM filter_area_xy,x=$xe,y=$ye
+					COM filter_area_end,layer=,filter_name=popup,operation=select,\
+						area_type=rectangle,inside_area=yes,intersect_area=yes,\
+						lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+						min_angle=0,max_angle=0
+					COM sel_delete		
+				endif
+				#鑽孔2(左下)
+				if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+					set xs = `echo "$drill_X2 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ys = `echo "$drill_Y2 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set xe = `echo "$drill_X2 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ye = `echo "$drill_Y2 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					COM filter_area_strt
+					COM filter_area_xy,x=$xs,y=$ys
+					COM filter_area_xy,x=$xe,y=$ye
+					COM filter_area_end,layer=,filter_name=popup,operation=select,\
+						area_type=rectangle,inside_area=yes,intersect_area=yes,\
+						lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+						min_angle=0,max_angle=0
+					COM sel_delete					
+				endif	
+				#鑽孔3(右上)
+				if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+					set xs = `echo "$drill_X3 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ys = `echo "$drill_Y3 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set xe = `echo "$drill_X3 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ye = `echo "$drill_Y3 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					COM filter_area_strt
+					COM filter_area_xy,x=$xs,y=$ys
+					COM filter_area_xy,x=$xe,y=$ye
+					COM filter_area_end,layer=,filter_name=popup,operation=select,\
+						area_type=rectangle,inside_area=yes,intersect_area=yes,\
+						lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+						min_angle=0,max_angle=0
+					COM sel_delete					
+				endif
+				#鑽孔4(右下)	
+				if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+					set xs = `echo "$drill_X4 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ys = `echo "$drill_Y4 - ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set xe = `echo "$drill_X4 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					set ye = `echo "$drill_Y4 + ($drill_Size + (457.2 * $scaleSize))/2000" | gbc`
+					COM filter_area_strt
+					COM filter_area_xy,x=$xs,y=$ys
+					COM filter_area_xy,x=$xe,y=$ye
+					COM filter_area_end,layer=,filter_name=popup,operation=select,\
+						area_type=rectangle,inside_area=yes,intersect_area=yes,\
+						lines_only=no,ovals_only=no,min_len=0,max_len=0,\
+						min_angle=0,max_angle=0
+					COM sel_delete					
+				endif				
+				#endregion
+			else
+				#region "刮負性PAD"				
+				#鑽孔1(左上)
+				set buf = r`echo "$drill_Size + (457.2 * $scaleSize)" | gbc`
+				if (`echo "$drill_X1 > 0 && $drill_Y1 < $pnlSize_Y" | gbc`) then
+					COM add_pad,attributes=no,x=$drill_X1,y=$drill_Y1,\
+						symbol=$buf,\
+						polarity=negative,angle=0,\
+						mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				endif
+				#鑽孔2(左下)
+				if (`echo "$drill_X2 > 0 && $drill_Y2 > 0" | gbc`) then
+					COM add_pad,attributes=no,x=$drill_X2,y=$drill_Y2,\
+						symbol=$buf,\
+						polarity=negative,angle=0,\
+						mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				endif	
+				#鑽孔3(右上)
+				if (`echo "$drill_X3 < $pnlSize_X && $drill_Y3 < $pnlSize_Y" | gbc`) then
+					COM add_pad,attributes=no,x=$drill_X3,y=$drill_Y3,\
+						symbol=$buf,\
+						polarity=negative,angle=0,\
+						mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				endif
+				#鑽孔4(右下)	
+				if (`echo "$drill_X4 < $pnlSize_X && $drill_Y4 > 0" | gbc`) then
+					COM add_pad,attributes=no,x=$drill_X4,y=$drill_Y4,\
+						symbol=$buf,\
+						polarity=negative,angle=0,\
+						mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				endif
+				#endregion
+			endif			
+		endif
+		#endregion
+
+		#endregion
+		
+		#region "4.增加光學位置"
+		#光學r=40 sc=118(2997.2) 負Pad=142(3606.8)
+		#region "防焊層"
+		if ($gROWlayer_type[$no] == 'solder_mask') then
+			#光學點1(左上)			
+			if (`echo "$optical_X1 > 0 && $optical_Y1 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X1,y=$optical_Y1,\
+					symbol=r$solderSize,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			endif	
+
+			#光學點2(左下)
+			if (`echo "$optical_X2 > 0 && $optical_Y2 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X2,y=$optical_Y2,\
+					symbol=r$solderSize,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+
+			#光學點3(右上)	
+			if (`echo "$optical_X3 < $pnlSize_X && $optical_Y3 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X3,y=$optical_Y3,\
+					symbol=r$solderSize,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+
+			#光學點4(右下)		
+			if (`echo "$optical_X4 < $pnlSize_X && $optical_Y4 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X4,y=$optical_Y4,\
+					symbol=r$solderSize,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif	
+		endif
+		#endregion
+		
+		#region "線路層"
+		if ($units == "mm") then
+			set sym = "r3606.8"
+		else
+			set sym = "r142"
+		endif		
+		if ($gROWlayer_type[$no] == 'signal') then
+			#光學點1(左上)
+			if (`echo "$optical_X1 > 0 && $optical_Y1 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X1,y=$optical_Y1,\
+					symbol=$sym,polarity=negative,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$optical_X1,y=$optical_Y1,\
+					symbol=r$optical_Size,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			endif	
+
+			#光學點2(左下)
+			if (`echo "$optical_X2 > 0 && $optical_Y2 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X2,y=$optical_Y2,\
+					symbol=$sym,polarity=negative,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				COM add_pad,attributes=no,x=$optical_X2,y=$optical_Y2,\
+					symbol=r$optical_Size,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+
+			#光學點3(右上)	
+			if (`echo "$optical_X3 < $pnlSize_X && $optical_Y3 < $pnlSize_Y" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X3,y=$optical_Y3,\
+					symbol=$sym,polarity=negative,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$optical_X3,y=$optical_Y3,\
+					symbol=r$optical_Size,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+			endif
+
+			#光學點4(右下)		
+			if (`echo "$optical_X4 < $pnlSize_X && $optical_Y4 > 0" | gbc`) then
+				COM add_pad,attributes=no,x=$optical_X4,y=$optical_Y4,\
+					symbol=$sym,polarity=negative,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				COM add_pad,attributes=no,x=$optical_X4,y=$optical_Y4,\
+					symbol=r$optical_Size,polarity=positive,angle=0,\
+					mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+			endif			
+
+		endif
+		#endregion
+		#endregion
+
+		#region "5.轉極性與個層別一致"
+		if ($gROWpolarity[$no] == 'negative') then
+			COM sel_invert
+		endif
+		#endregion		
+	
+		COM display_layer,name=$gROWname[$no],display=no,number=1
+		
+	endif
+end
+
+#增加Profile
+COM profile_rect,x1=0,y1=0,x2=$pnlSize_X,y2=$pnlSize_Y
+
+#PAUSE "Copy your want li to auto_li"
+EXIT:

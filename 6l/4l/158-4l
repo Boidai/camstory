@@ -1,0 +1,237 @@
+COM affected_layer,name=int1,mode=single,affected=yes
+COM affected_layer,name=int2,mode=single,affected=yes
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line
+COM filter_set,filter_name=popup,update_popup=no,include_syms=r63
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_delete
+COM affected_layer,name=int1,mode=single,affected=no
+COM affected_layer,name=int2,mode=single,affected=no
+COM display_layer,name=int1,display=yes,number=1
+COM work_layer,name=int1
+COM filter_set,filter_name=popup,update_popup=no,feat_types=
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_set,filter_name=popup,update_popup=no,polarity=
+COM filter_set,filter_name=popup,update_popup=no,polarity=negative
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_reverse
+COM sel_move_other,target_layer=int1-158,invert=no,dx=0,dy=0,\
+size=0
+COM display_layer,name=int1,display=no,number=1
+COM display_layer,name=int2,display=yes,number=1
+COM work_layer,name=int2
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_reverse
+COM sel_move_other,target_layer=int2-158,invert=no,dx=0,dy=0,\
+size=0
+COM display_layer,name=int2,display=no,number=1
+COM display_layer,name=sc,display=yes,number=1
+COM work_layer,name=sc
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive\;negative
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM affected_layer,name=int1,mode=single,affected=yes
+COM affected_layer,name=int2,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,\
+dx=0,dy=0,size=0
+COM display_layer,name=sc,display=no,number=1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_resize_surface,island_size=-230,hole_size=-100,drill_filter=no,\
+corner_ctl=no
+COM filter_reset,filter_name=popup
+COM affected_layer,name=int1,mode=single,affected=no
+COM affected_layer,name=int2,mode=single,affected=no
+COM display_layer,name=int1-158,display=yes,number=1
+COM work_layer,name=int1-158
+COM sel_move_other,target_layer=int1,invert=no,dx=0,dy=0,size=0
+COM display_layer,name=int1-158,display=no,number=1
+COM display_layer,name=int2-158,display=yes,number=1
+COM work_layer,name=int2-158
+COM sel_move_other,target_layer=int2,invert=no,dx=0,dy=0,size=0
+COM display_layer,name=int2-158,display=no,number=1
+COM display_layer,name=stupy,display=yes,number=1
+COM work_layer,name=stupy
+COM affected_layer,name=int1,mode=single,affected=yes
+COM affected_layer,name=int2,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=40
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,\
+dx=0,dy=0,size=14
+COM display_layer,name=stupy,display=no,number=1
+COM affected_layer,name=int2,mode=all,affected=no
+
+COM units,type=mm
+set GBCF="$GENESIS_DIR/e$GENESIS_VER/misc/gbc -l"
+COM snap_mode,mode=center
+	
+set path=$GENESIS_TMP/center
+COM info,out_file=$path,write_mode=replace,units=mm, args= -t step -e $JOB/$STEP -d PROF_LIMITS , units=mm
+source $path
+set Xc = `echo "($gPROF_LIMITSxmax+$gPROF_LIMITSxmin)*0.5" | $GBCF`
+set Yc = `echo "($gPROF_LIMITSymax+$gPROF_LIMITSymin)*0.5" | $GBCF`
+	
+COM profile_to_rout,layer=55a,width=10
+COM display_layer,name=sod+1,display=no,number=3
+COM display_layer,name=55a,display=yes,number=1
+COM work_layer,name=55a
+COM sel_cut_data,det_tol=1,con_tol=1,rad_tol=0.1,filter_overlaps=no,\
+delete_doubles=no,use_order=yes,ignore_width=yes,ignore_holes=none,\
+start_positive=yes
+
+	
+COM add_pad,attributes=no,x=$Xc,y=$Yc,symbol=coffee,\
+polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,\
+yscale=1
+
+COM profile_to_rout,layer=55b,width=10
+COM display_layer,name=sod+1,display=no,number=3
+COM display_layer,name=55b,display=yes,number=1
+COM work_layer,name=55b
+COM sel_cut_data,det_tol=1,con_tol=1,rad_tol=0.1,filter_overlaps=no,\
+delete_doubles=no,use_order=yes,ignore_width=yes,ignore_holes=none,\
+start_positive=yes
+
+	
+COM add_pad,attributes=no,x=$Xc,y=$Yc,symbol=coffee-1,\
+polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,\
+yscale=1
+
+
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee-1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM affected_layer,name=int2,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=0
+COM affected_layer,name=int2,mode=single,affected=no
+COM display_layer,name=55b,display=no,number=1
+COM display_layer,name=55a,display=yes,number=1
+COM work_layer,name=55a
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM affected_layer,name=int1,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=0
+COM display_layer,name=55a,display=no,number=1
+COM affected_layer,name=int1,mode=single,affected=no
+COM display_layer,name=int1,display=yes,number=1
+COM work_layer,name=int1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_contourize,accuracy=6.35,break_to_islands=yes,clean_hole_size=76.2,\
+clean_hole_mode=x_and_y
+COM display_layer,name=int1,display=no,number=1
+COM display_layer,name=int2,display=yes,number=1
+COM work_layer,name=int2
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive\;negative
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface\;text
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface\;arc\;text
+COM filter_set,filter_name=popup,update_popup=no,feat_types=pad\;surface\;arc\;text
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc\;text
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee-1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_reset,filter_name=popup
+COM sel_contourize,accuracy=6.35,break_to_islands=yes,clean_hole_size=76.2,\
+clean_hole_mode=x_and_y
+COM units,type=inch
+COM display_layer,name=int2,display=no,number=1
+
+### 輸出及取得Genesis的資料 ####
+set info=$GENESIS_TMP/t1
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+set GBCF="$GENESIS_DIR/e$GENESIS_VER/misc/gbc -l"
+#COM open_entity,job=$job,type=matrix,name=matrix,iconic=no
+set i=0
+foreach no($gROWrow)
+    if ($gROWname[$no] == 'int1-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+    if ($gROWname[$no] == 'int2-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55a') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55a+++') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55b') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55b+++') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+end
+
+
+COM matrix_refresh,job=$job,matrix=matrix
+COM matrix_page_close,job=$job,matrix=matrix

@@ -1,0 +1,3 @@
+COM cur_atr_set,attribute=.out_flag,int=226
+COM snap_mode,mode=center
+

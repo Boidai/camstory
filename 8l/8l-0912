@@ -1,0 +1,35 @@
+COM units,type=mm
+set GBCF="$GENESIS_DIR/e$GENESIS_VER/misc/gbc -l"
+COM snap_mode,mode=center
+	
+set path=$GENESIS_TMP/center
+COM info,out_file=$path,write_mode=replace,units=mm, args= -t step -e $JOB/$STEP -d PROF_LIMITS , units=mm
+source $path
+set Xc = `echo "($gPROF_LIMITSxmax+$gPROF_LIMITSxmin)*0.5" | $GBCF`
+set Yc = `echo "($gPROF_LIMITSymax+$gPROF_LIMITSymin)*0.5" | $GBCF`
+	
+COM profile_to_rout,layer=55a,width=10
+COM display_layer,name=sod+1,display=no,number=3
+COM display_layer,name=55a,display=yes,number=1
+COM work_layer,name=55a
+COM sel_cut_data,det_tol=1,con_tol=1,rad_tol=0.1,filter_overlaps=no,\
+delete_doubles=no,use_order=yes,ignore_width=yes,ignore_holes=none,\
+start_positive=yes
+
+	
+COM add_pad,attributes=no,x=$Xc,y=$Yc,symbol=coffee,\
+polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,\
+yscale=1
+
+COM profile_to_rout,layer=55b,width=10
+COM display_layer,name=sod+1,display=no,number=3
+COM display_layer,name=55b,display=yes,number=1
+COM work_layer,name=55b
+COM sel_cut_data,det_tol=1,con_tol=1,rad_tol=0.1,filter_overlaps=no,\
+delete_doubles=no,use_order=yes,ignore_width=yes,ignore_holes=none,\
+start_positive=yes
+
+	
+COM add_pad,attributes=no,x=$Xc,y=$Yc,symbol=coffee-1,\
+polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,\
+yscale=1

@@ -1,0 +1,590 @@
+#region "說明"
+#MOUSE  [  p | r ]  <  displayed_message  >
+#傳回值:
+#$MOUSEANS  ------以 (x y) & ( x1 y1 x2 y2)方式傳回
+#Example : 
+#    MOUSE p  Click on feature to be deleted
+#    set feature = ( $MOUSEANS )
+#	set MouseX = $feature[1]
+#	set MouseY = $feature[2]
+#echo “scale = 3;3.5 + 4.5” |bc 	
+#endregion
+
+#region "暫存檔設定"
+set TMP = $GENESIS_DIR/tmp
+if ( ! -d "$GENESIS_DIR/tmp") then
+	mkdir "$GENESIS_DIR/tmp"	
+endif
+set info = $TMP/info
+set gui_in = $TMP/gui_in
+set gui_out = $TMP/gui_out
+#endregion
+
+#假如上一個排版F7資料還在,就利用標尺吋
+set job_srData = $TMP/$JOB"_srData"
+if (! -f "$TMP/$job_srData") then
+	#region "GUI視窗"
+	echo "WIN 100 100"					>  $gui_in
+	echo "FONT tbr24"					>> $gui_in
+	echo "LABEL F9_Dimensions Units "	>> $gui_in
+	echo "FONT tbr18"					>> $gui_in
+
+	echo "RADIO units Units__________________ H 1 990000"	>> $gui_in
+	echo "mm"							>> $gui_in
+	echo "inch"							>> $gui_in
+	echo "END"							>> $gui_in
+
+	#增加料號
+	echo "RADIO jobName 'Add____JOB____Name ?' H 1 990000"	>> $gui_in
+	echo "Yes"							>> $gui_in
+	echo "No"							>> $gui_in
+	echo "END"							>> $gui_in
+
+	#折斷邊尺寸
+	echo "TEXT breakSizeTop    Top____Break_Edge_Size : "			>>$gui_in
+	echo "DTEXT breakSizeTop 0"			>>$gui_in
+	echo "TEXT breakSizeBottom Bottom_Break_Edge_Size : "	>>$gui_in
+	echo "DTEXT breakSizeBottom 0"		>>$gui_in
+	echo "TEXT breakSizeLeft   Left___Break_Edge_Size : "		>>$gui_in
+	echo "DTEXT breakSizeLeft 0"		>>$gui_in
+	echo "TEXT breakSizeRight  Right__Break_Edge_Size : "		>>$gui_in
+	echo "DTEXT breakSizeRight 0"		>>$gui_in
+
+	gui $gui_in > $gui_out
+	#endregion
+else
+	set gui_out = $TMP/$JOB_srData
+endif
+
+source $gui_out
+\rm $gui_in $gui_out 
+	
+#region "判斷Profile是否有做出來"
+if ($units == 1) then	#1=mm
+	set units = 'mm'
+else
+	set units = 'inch'
+endif
+
+\rm $info
+COM info, out_file=$info,write_mode=replace,units=$units, \
+args= -t step -e $JOB/$STEP -d PROF_LIMITS
+#檔案內容
+#set gPROF_LIMITSxmin = '0'
+#set gPROF_LIMITSymin = '0'
+#set gPROF_LIMITSxmax = '0'
+#set gPROF_LIMITSymax = '0'
+source $info
+\rm $info
+
+#要先做Profile
+if ($gPROF_LIMITSxmax == "0" && $gPROF_LIMITSxmin == "0") then
+	PAUSE "Run Step/Profile set Size !"
+endif
+#endregion
+
+set originX = 0
+set originY = 0
+
+#region "判斷長邊尺寸"
+if (`echo "$gPROF_LIMITSymax > $gPROF_LIMITSxmax" | gbc`) then
+	set longSize = $gPROF_LIMITSymax
+else
+	set longSize = $gPROF_LIMITSxmax
+endif
+#endregion
+
+#region "公英制變數設定"
+#設定老鼠STOP距離
+set mouseStopOverSize = `echo "$longSize*0.1" | gbc`
+
+if ($units == 'mm') then	#1=mm
+	COM units,type=mm
+	set unit2mm = 1
+	set text2unit = 25.4
+	set line = 250
+	set symbol = 'tri2540x2540'
+	set lineLength = 10
+	set wordMoveCenter = 1.2
+	set Point2Triangle = 4
+	set DecimalSum = 1000	#小數點後2位
+	set DecimalUnits = 0.01	
+	#mouseStopOverSize小於20mm
+	if (`echo "$mouseStopOverSize < 10" | gbc`) then
+		set mouseStopOverSize = 10
+	endif	
+else	#2=inch
+	COM units,type=inch
+	set unit2mm = 25.4
+	set text2unit = 1
+	set line = 9.8
+	set symbol = 'tri100x100'
+	set lineLength = 0.393
+	set wordMoveCenter = 0.047
+	set Point2Triangle = 0.157
+	set DecimalSum = 10000	#小數點後3位
+	set DecimalUnits = 0.001	
+	#mouseStopOverSize小於0.59
+	if (`echo "$mouseStopOverSize < 393" | gbc`) then
+		set mouseStopOverSize = 0.393
+	endif
+endif
+#endregion
+
+#region "文字尺寸判斷wordSize"
+if ($units == 'mm') then
+	if (`echo "$longSize > 250" | gbc`) then
+		set wordSize = 5
+		set wordWidth = 1.25
+	else if (`echo "$longSize > 60" | gbc`) then
+		set wordSize = 3
+		set wordWidth = 1.0
+	else
+		set wordSize = 2
+		set wordWidth = 0.833
+	endif
+else
+	if (`echo "$longSize > 250" | gbc`) then
+		set wordSize = 0.196
+		set wordWidth = 1.25
+	else if (`echo "$longSize > 60" | gbc`) then
+		set wordSize = 0.118
+		set wordWidth = 1.0
+	else
+		set wordSize = 0.078
+		set wordWidth = 0.833
+	endif
+else
+endif
+#endregion
+
+#設定snap
+COM snap_mode,mode=off
+
+#region "增加使用單位字樣"
+set unitText = 'units='$units
+set MouseX = 0
+set MouseY = 0
+
+#滑鼠點選位置
+MOUSE p Add Text : $unitText on mouse_position
+set feature = ( $MOUSEANS )
+set MouseX = $feature[1]
+set MouseY = $feature[2]
+
+COM add_text,attributes=no,type=string,x=$MouseX,y=$MouseY,text=$unitText,\
+	x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,polarity=positive,\
+	angle=0,mirror=no,fontname=standard	
+#endregion	
+
+#region "增加料號"
+if ($jobName == 1) then
+	set unitText = 'units='$units
+	set MouseX = 0
+	set MouseY = 0
+
+	#滑鼠點選位置
+	MOUSE p Add Text=$JOB on mouse_position
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+
+	COM add_text,attributes=no,type=string,x=$MouseX,y=$MouseY,text=$JOB,\
+		x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,polarity=positive,\
+		angle=0,mirror=no,fontname=standard
+endif
+#endregion
+
+#設定snap
+COM snap_mode,mode=intersect
+
+#region "Top 尺寸"
+set MouseX = 0
+set MouseY = 0
+set breakEdgeSize = $breakSizeTop
+
+if ($units == 'mm') then
+	set Line2Word = 5
+else
+	set Line2Word = 0.196
+endif
+
+#標示尺寸,當老鼠座標超過mouseStopOverSize時,停止迴圈
+set i = 1
+while (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`)
+	#每次顯示文字不一樣
+	if (`echo "$i == 1" | gbc`) then
+		MOUSE p Top First Origin set to 0 (Over Profile $mouseStopOverSize $units Stop)
+	else
+		MOUSE p Top $i Point (Over Profile $mouseStopOverSize $units Stop)
+	endif
+	#取得座標值
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+	
+	#設定起始位置,後續point須扣除此距離
+	if (`echo "$i == 1" | gbc`) then
+		set origin = $MouseX
+	endif
+
+	#標註的尺寸,須四捨五入,小數點後幾位
+	set word = `echo "($MouseX - $origin)*$DecimalSum/1" | gbc`
+	if (`echo "($word % 10 > 4)" | gbc`) then
+		set word = `echo "($word/10+1)*$DecimalUnits" | gbc`
+	else
+		set word = `echo "($word/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$word < 1" | gbc` && `echo "$i != 1" | gbc`) then
+		set word = "0$word"
+	endif
+	
+	#座標變數設定
+	set YS = `echo "$MouseY + $breakEdgeSize + $Point2Triangle" | gbc`
+	set YE = `echo "$YS + $lineLength" | gbc`
+	set XS = $MouseX
+	set XE = $MouseX
+	set wordX = `echo "$XS + $wordMoveCenter" | gbc`
+	set wordY = `echo "$YE + $Line2Word" | gbc`
+	
+	#未超出STOP區域,劃出箭頭及尺寸文字
+	if (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`) then
+		#三角形箭頭
+		COM add_pad,attributes=no,x=$XS,y=$YS,symbol=$symbol,\
+			polarity=positive,angle=180,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		#引申線
+		COM add_line,attributes=no,xs=$XS,ys=$YS,xe=$XE,ye=$YE,\
+			symbol=r$line,polarity=positive
+		#尺寸文字			
+		COM add_text,attributes=no,type=string,x=$wordX,y=$wordY,\
+			text=$word,x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+			polarity=positive,angle=270,mirror=no,fontname=standard	
+		#設定原點X座標
+		if (`echo "$i == 1" | gbc`) then
+			set originX = $MouseX
+		endif
+	endif
+	
+	@ i ++
+end
+#endregion
+
+#region "Bottom 尺寸"
+set MouseX = 0
+set MouseY = 0
+set breakEdgeSize = $breakSizeBottom
+
+if ($units == 'mm') then
+	set Line2Word = 5
+else
+	set Line2Word = 0.196
+endif
+
+#標示尺寸,當老鼠座標超過mouseStopOverSize時,停止迴圈
+set i = 1
+while (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`)
+	#每次顯示文字不一樣
+	if (`echo "$i == 1" | gbc`) then
+		MOUSE p Bottom First Origin set to 0 (Over Profile $mouseStopOverSize $units Stop)
+	else
+		MOUSE p Bottom $i Point (Over Profile $mouseStopOverSize $units Stop)
+	endif
+	#取得座標值
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+	
+	#設定起始位置,後續point須扣除此距離
+	if (`echo "$i == 1" | gbc`) then
+		set origin = $MouseX
+	endif
+
+	#標註的尺寸,須四捨五入,小數點後幾位
+	set word = `echo "($MouseX - $origin)*$DecimalSum/1" | gbc`
+	if (`echo "($word % 10 > 4)" | gbc`) then
+		set word = `echo "($word/10+1)*$DecimalUnits" | gbc`
+	else
+		set word = `echo "($word/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$word < 1" | gbc` && `echo "$i != 1" | gbc`) then
+		set word = "0$word"
+	endif
+	
+	#座標變數設定
+	set YS = `echo "$MouseY - $breakEdgeSize - $Point2Triangle" | gbc`
+	set YE = `echo "$YS - $lineLength" | gbc`
+	set XS = $MouseX
+	set XE = $MouseX
+	set wordX = `echo "$XS - $wordMoveCenter" | gbc`
+	set wordY = `echo "$YE - $Line2Word" | gbc`
+	
+	#未超出STOP區域,劃出箭頭及尺寸文字
+	if (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`) then
+		#三角形箭頭
+		COM add_pad,attributes=no,x=$XS,y=$YS,symbol=$symbol,\
+			polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		#引申線
+		COM add_line,attributes=no,xs=$XS,ys=$YS,xe=$XE,ye=$YE,\
+			symbol=r$line,polarity=positive
+		#尺寸文字			
+		COM add_text,attributes=no,type=string,x=$wordX,y=$wordY,\
+			text=$word,x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+			polarity=positive,angle=90,mirror=no,fontname=standard
+		#設定原點X座標
+		if (`echo "$i == 1" | gbc`) then
+			set originX = $MouseX
+		endif			
+	endif
+	
+	@ i ++
+end
+#endregion
+
+#region "Left 尺寸"
+set MouseX = 0
+set MouseY = 0
+set breakEdgeSize = $breakSizeLeft
+
+#依公英制設定變數,右邊要移動多一點
+if ($units == 'mm') then
+	set Line2Word = 20
+else
+	set Line2Word = 0.787
+endif
+
+#標示尺寸,當老鼠座標超過mouseStopOverSize時,停止迴圈
+set i = 1
+while (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`)
+	#每次顯示文字不一樣
+	if (`echo "$i == 1" | gbc`) then
+		MOUSE p Left First Origin set to 0 (Over Profile $mouseStopOverSize $units Stop)
+	else
+		MOUSE p Left $i Point (Over Profile $mouseStopOverSize $units Stop)
+	endif
+	#取得座標值
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+	
+	#設定起始位置,後續point須扣除此距離
+	if (`echo "$i == 1" | gbc`) then
+		set origin = $MouseY
+	endif
+
+	#標註的尺寸,須四捨五入,小數點後幾位
+	set word = `echo "($MouseY - $origin)*$DecimalSum/1" | gbc`
+	if (`echo "($word % 10 > 4)" | gbc`) then
+		set word = `echo "($word/10+1)*$DecimalUnits" | gbc`
+	else
+		set word = `echo "($word/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$word < 1" | gbc` && `echo "$i != 1" | gbc`) then
+		set word = "0$word"
+	endif
+	
+	#座標變數設定
+	set YS = $MouseY
+	set YE = $MouseY
+	set XS = `echo "$MouseX - $breakEdgeSize - $Point2Triangle" | gbc`
+	set XE = `echo "$XS - $lineLength" | gbc`
+	set wordX = `echo "$XE - $Line2Word" | gbc`
+	set wordY = `echo "$YS - $wordMoveCenter" | gbc`
+	
+	#未超出STOP區域,劃出箭頭及尺寸文字
+	if (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`) then
+		#三角形箭頭
+		COM add_pad,attributes=no,x=$XS,y=$YS,symbol=$symbol,\
+			polarity=positive,angle=90,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		#引申線
+		COM add_line,attributes=no,xs=$XS,ys=$YS,xe=$XE,ye=$YE,\
+			symbol=r$line,polarity=positive
+		#尺寸文字			
+		COM add_text,attributes=no,type=string,x=$wordX,y=$wordY,\
+			text=$word,x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+			polarity=positive,angle=0,mirror=no,fontname=standard	
+		#設定原點Y座標
+		if (`echo "$i == 1" | gbc`) then
+			set originY = $MouseY
+		endif
+	endif
+	
+	@ i ++
+end
+#endregion
+
+#region "Right 尺寸"
+set MouseX = 0
+set MouseY = 0
+set breakEdgeSize = $breakSizeRight
+
+if ($units == 'mm') then
+	set Line2Word = 5
+else
+	set Line2Word = 0.196
+endif
+
+#標示尺寸,當老鼠座標超過mouseStopOverSize時,停止迴圈
+set i = 1
+while (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`)
+	#每次顯示文字不一樣
+	if (`echo "$i == 1" | gbc`) then
+		MOUSE p Right First Origin set to 0 (Over Profile $mouseStopOverSize $units Stop)
+	else
+		MOUSE p Right $i Point (Over Profile $mouseStopOverSize $units Stop)
+	endif
+	#取得座標值
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+	
+	#設定起始位置,後續point須扣除此距離
+	if (`echo "$i == 1" | gbc`) then
+		set origin = $MouseY
+	endif
+
+	#標註的尺寸,須四捨五入,小數點後幾位
+	set word = `echo "($MouseY - $origin)*$DecimalSum/1" | gbc`
+	if (`echo "($word % 10 > 4)" | gbc`) then
+		set word = `echo "($word/10+1)*$DecimalUnits" | gbc`
+	else
+		set word = `echo "($word/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$word < 1" | gbc` && `echo "$i != 1" | gbc`) then
+		set word = "0$word"
+	endif
+	
+	#座標變數設定
+	set YS = $MouseY
+	set YE = $MouseY
+	set XS = `echo "$MouseX + $breakEdgeSize + $Point2Triangle" | gbc`
+	set XE = `echo "$XS + $lineLength" | gbc`
+	set wordX = `echo "$XE + $Line2Word" | gbc`
+	set wordY = `echo "$YS - $wordMoveCenter" | gbc`
+	
+	#未超出STOP區域,劃出箭頭及尺寸文字
+	if (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`) then
+		#三角形箭頭
+		COM add_pad,attributes=no,x=$XS,y=$YS,symbol=$symbol,\
+			polarity=positive,angle=270,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		#引申線
+		COM add_line,attributes=no,xs=$XS,ys=$YS,xe=$XE,ye=$YE,\
+			symbol=r$line,polarity=positive
+		#尺寸文字			
+		COM add_text,attributes=no,type=string,x=$wordX,y=$wordY,\
+			text=$word,x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+			polarity=positive,angle=0,mirror=no,fontname=standard
+		#設定原點Y座標
+		if (`echo "$i == 1" | gbc`) then
+			set originY = $MouseY
+		endif			
+	endif
+	
+	@ i ++
+end
+#endregion
+
+#region "量測PAD中心點座標,設定snap"
+COM snap_mode,mode=center
+set MouseX = 0
+set MouseY = 0
+
+if ($units == 'mm') then
+	set Point2Word = 3
+else
+	set Point2Word = 0.118
+endif
+
+#標示尺寸,當老鼠座標超過mouseStopOverSize時,停止迴圈
+while (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`)
+	
+	MOUSE p PAD Coordinate (Over Profile $mouseStopOverSize $units Stop)
+
+	#取得座標值
+	set feature = ( $MOUSEANS )
+	set MouseX = $feature[1]
+	set MouseY = $feature[2]
+	
+	#X座標,須四捨五入,小數點後幾位
+	set bufX = `echo "($MouseX - $originX)*$DecimalSum/1" | gbc`
+	if (`echo "($bufX % 10 > 4)" | gbc`) then
+		set bufX = `echo "($bufX/10+1)*$DecimalUnits" | gbc`
+	else
+		set bufX = `echo "($bufX/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$bufX < 1" | gbc`) then
+		set bufX = "0$bufX"
+	endif
+
+	#Y座標,須四捨五入,小數點後幾位
+	set buffY = `echo "($MouseY - $originY)*$DecimalSum/1" | gbc`
+	if (`echo "($buffY % 10 > 4)" | gbc`) then
+		set buffY = `echo "($buffY/10+1)*$DecimalUnits" | gbc`
+	else
+		set buffY = `echo "($buffY/10)*$DecimalUnits" | gbc`
+	endif
+	#小於1要加上0字樣
+	if (`echo "$buffY < 1" | gbc`) then
+		set buffY = "0$buffY"
+	endif	
+
+	#無法使用","透號,會認為是指令分隔
+	set word = '('"$bufX"';'"$buffY"')'
+
+	#座標變數設定
+	set wordX = `echo "$MouseX + $Point2Word" | gbc`
+	set wordY = `echo "$MouseY - $wordMoveCenter" | gbc`
+	
+	#未超出STOP區域,劃出箭頭及尺寸文字
+	if (`echo "$MouseX < ($gPROF_LIMITSxmax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseX > ($gPROF_LIMITSxmin - $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY < ($gPROF_LIMITSymax + $mouseStopOverSize)" | gbc`\
+		&& `echo "$MouseY > ($gPROF_LIMITSymin - $mouseStopOverSize)" | gbc`) then
+		#尺寸文字
+		
+		COM add_text,attributes=no,type=string,x=$wordX,y=$wordY,\
+			text=$word,x_size=$wordSize,y_size=$wordSize,w_factor=$wordWidth,\
+			polarity=positive,angle=0,mirror=no,fontname=standard	
+	endif
+end
+#endregion
+
+#取消snap
+COM snap_mode,mode=off
+
+EXIT:
+
+
+
+

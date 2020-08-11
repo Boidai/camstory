@@ -1,0 +1,44 @@
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad
+COM filter_set,filter_name=popup,update_popup=no,feat_types=pad
+COM filter_set,filter_name=popup,update_popup=no,include_syms=r15.7
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_change_sym,symbol=p4-i1,reset_angle=no
+COM display_layer,name=int1,display=no,number=1
+COM display_layer,name=int2,display=yes,number=1
+COM work_layer,name=int2
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_change_sym,symbol=p4-i12,reset_angle=no
+COM display_layer,name=int2,display=no,number=1
+COM display_layer,name=int3,display=yes,number=1
+COM work_layer,name=int3
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_change_sym,symbol=p4-i123,reset_angle=no
+COM display_layer,name=int3,display=no,number=1
+COM display_layer,name=int4,display=yes,number=1
+COM work_layer,name=int4
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_change_sym,symbol=p4-i1234,reset_angle=no
+COM display_layer,name=int4,display=no,number=1
+COM display_layer,name=cop,display=yes,number=1
+COM work_layer,name=cop
+COM affected_layer,name=sod,mode=single,affected=yes
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_change_sym,symbol=r100,reset_angle=no

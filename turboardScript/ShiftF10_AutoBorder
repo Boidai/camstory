@@ -1,0 +1,1749 @@
+﻿#!/bin/csh
+#echo “scale = 3;3.5 + 4.5” |bc  
+#設定變數
+set TMP=$GENESIS_TMP
+
+#檔案不存在
+if ((! -f $GENESIS_EDIR/all/gui_ezcam.exe) && (-f $GENESIS_DIR/sys/scripts/turboardScript/gui.exe)\
+	&& (-f $GENESIS_DIR/sys/scripts/turboardScript/FreeImage32.dll)\
+	&& (-f $GENESIS_DIR/sys/scripts/turboardScript/FreeImage64.dll)) then
+	
+	cp "$GENESIS_DIR/sys/scripts/turboardScript/gui.exe" \
+		"$GENESIS_DIR/all/gui_ezcam.exe"
+	cp "$GENESIS_DIR/sys/scripts/turboardScript/FreeImage32.dll" \
+		"$GENESIS_DIR/all/FreeImage32.dll"
+	cp "$GENESIS_DIR/sys/scripts/turboardScript/FreeImage64.dll" \
+		"$GENESIS_DIR/all/FreeImage64.dll"
+endif
+
+if (-f $GENESIS_EDIR/all/gui_ezcam.exe) then
+	set guiFile=$GENESIS_EDIR/all/gui_ezcam.exe
+else
+	set guiFile=$GENESIS_EDIR/bin/gui.exe
+endif
+
+
+set info=$TMP/info
+set gui_out=$TMP/gui_out
+set gui_input=$TMP/gui_input
+
+
+#基本檔案不存在或舊本,複製檔案
+#if ( ! -f "$GENESIS_DIR/sys/hooks/ncd/ver") then
+#	set now = `date +"%Y%m%d"`
+#	#更名
+#	mv "$GENESIS_DIR/sys/hooks/ncd/out_file" \
+#		"$GENESIS_DIR/sys/hooks/ncd/out_file_$now"
+#	mv "$GENESIS_DIR/sys/hooks/ncd/set_table" \
+#		"$GENESIS_DIR/sys/hooks/ncd/set_table_$now"
+#	mv "$GENESIS_DIR/sys/hooks/drill_size" \
+#		"$GENESIS_DIR/sys/hooks/drill_size_$now"		
+#	#產生檔案
+#	echo "set ver = 1" > $GENESIS_DIR/sys/hooks/ncd/ver
+#	
+#	#複製檔案
+#	cp "$GENESIS_DIR/sys/scripts/backData/out_file" \
+#		"$GENESIS_DIR/sys/hooks/ncd/out_file"
+#	cp "$GENESIS_DIR/sys/scripts/backData/set_table" \
+#		"$GENESIS_DIR/sys/hooks/ncd/set_table"
+#	cp "$GENESIS_DIR/sys/scripts/backData/drill_size" \
+#		"$GENESIS_DIR/sys/hooks/drill_size"	
+#		
+#	#region "寫入快速鍵bindings"
+#	#KEY=<Shift>F2
+#	#sed "s/\\/\//g"取代反斜線為/
+#	set bindingsPath = $HOME/.genesis/bindings
+#	#F2
+#	echo "BINDING {" >> $bindingsPath
+#	echo "	KEY=<Shift>F2" >> $bindingsPath
+#	set buf = `echo $GENESIS_DIR/sys/scripts/backData/ShiftF2_save | sed "s/\\/\//g"`
+#	echo "  SCRIPT=$buf" >> $bindingsPath
+#	echo "}" >> $bindingsPath
+#	echo "" >> $bindingsPath	
+#	#F7排版及折斷邊
+#	echo "BINDING {" >> $bindingsPath
+#	echo "	KEY=<Shift>F7" >> $bindingsPath
+#	set buf = `echo $GENESIS_DIR/sys/scripts/backData/ShiftF7_SandR_BreakSide | sed "s/\\/\//g"`
+#	echo "	SCRIPT=$buf" >> $bindingsPath
+#	echo "}" >> $bindingsPath
+#	echo "" >> $bindingsPath
+#	#F8阻抗條
+#	echo "BINDING {" >> $bindingsPath
+#	echo "	KEY=<Shift>F8" >> $bindingsPath
+#	set buf = `echo $GENESIS_DIR/sys/scripts/backData/ShiftF8_Coupon | sed "s/\\/\//g"`		
+#	echo "	SCRIPT=$buf" >> $bindingsPath
+#	echo "}" >> $bindingsPath
+#	echo "" >> $bindingsPath	
+#	#F9機構圖標尺吋
+#	echo "BINDING {" >> $bindingsPath
+#	echo "	KEY=<Shift>F9" >> $bindingsPath
+#	set buf = `echo $GENESIS_DIR/sys/scripts/backData/ShiftF9_Dimensions | sed "s/\\/\//g"`		
+#	echo "	SCRIPT=$buf" >> $bindingsPath
+#	echo "}" >> $bindingsPath
+#	echo "" >> $bindingsPath	
+#	#F10自動框
+#	echo "BINDING {" >> $bindingsPath
+#	echo "	KEY=<Shift>F10" >> $bindingsPath
+#	set buf = `echo $GENESIS_DIR/sys/scripts/backData/ShiftF10_AutoBorder | sed "s/\\/\//g"`	
+#	echo "	SCRIPT=$buf" >> $bindingsPath
+#	echo "}" >> $bindingsPath
+#	echo "" >> $bindingsPath	
+#	
+#	#endregion
+#	
+#endif
+
+
+#刪除舊檔案
+\rm $info $gui_out $gui_input
+
+### 輸出及取得Genesis的資料 ####
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+
+#region 初始化變數=0，gui_input檔案內容
+	set WorkSize_X = "0"	#發料尺寸X
+	set WorkSize_Y = "0"	#發料尺寸Y
+	set Step_Name = "0"		#(選擇第幾個選項)
+	set SR_Margin = "0"		#排版間距
+	set Step_DIR = "0"   	#(1=水平 2=垂直)
+	set outSignal = "0"		#(1=外層線路形成方式Tenting直接蝕刻 2=電鍍蝕刻)
+	set Job_UpDown = "0"	#(1=料號層名寫在上電鍍框 2=下電鍍框)
+	set cbtPin = "0"		#(1=yes  2=no)
+	set sort_drill = "0"	#(檢驗孔1=yes  2=no)	
+	set Show_Plated = "0"	#(2=不顯示 1=秀出電鍍框單邊尺寸)
+	set innerBorder = "0"	#(1=銅面+流膠條  2=組膠豆)
+	set ExpHole = "0"		#(1=增加防爆孔  2=no)
+	set LayerSumWord = "0"	#(1=顯示文字防焊層數  2=no)
+	set Exit_Script = "0"	#(1=繼續 2=中斷結束)	
+
+#endregion
+if ( -f "$GENESIS_DIR/sys/scripts/valor_GUI.exe") then
+	#region "中文GUI介面"
+	set infoFile=$GENESIS_DIR/sys/scripts/infoFile
+	#檔案內容如上列"初始化變數"
+	
+	
+	#將step名稱傳出去
+	#gCOLstep_name=org pcs wpnl
+	
+    \rm infoFile 
+	#傳入參數=step的名稱及
+	valor_GUI.exe $gCOLstep_name
+	
+	PAUSE "Wait Chinese GUI Input OK"
+	source $infoFile
+	\rm infoFile
+	#endregion
+else
+	#region "使用Genesis GUI介面"
+	echo "WIN 200 200">>$gui_out
+	echo "CLABEL 開始執行">>$gui_out
+	echo "FONT tbi24">>$gui_out
+	echo "FG 999999">>$gui_out
+	echo "LABEL 單位=mm">>$gui_out
+
+	echo "BG 959590">>$gui_out
+	echo "FG 000000">>$gui_out
+	echo "TEXT WorkSize_X 發料尺寸_X =">>$gui_out
+	echo "DTEXT WorkSize_X 310">>$gui_out
+	echo "TEXT WorkSize_Y 發料尺寸_Y =">>$gui_out
+	echo "DTEXT WorkSize_Y 413">>$gui_out
+
+	echo "BG 800000">>$gui_out
+	echo "FG 999999">>$gui_out
+	echo "OPTION Step_Name 選擇step = ">>$gui_out
+		foreach sb_step($gCOLstep_name)
+			if ($sb_step == 'org') then
+				set sb_step='choose_step?'
+			endif
+			echo "$sb_step">>$gui_out
+		end
+	echo "END">>$gui_out
+
+	echo "BG 959590">>$gui_out
+	echo "FG 000000">>$gui_out
+	echo "TEXT SR_Margin 排版間距 = ">>$gui_out
+	echo "DTEXT SR_Margin 3">>$gui_out
+
+	echo "BG 800000">>$gui_out
+	echo "FG 999999">>$gui_out
+	echo "OPTION Step_DIR 旋轉角度 = ">>$gui_out
+	echo "Angle 0">>$gui_out
+	echo "Angle 90">>$gui_out
+	echo "END">>$gui_out
+
+	echo "BG 959590">>$gui_out
+	echo "FG 000000">>$gui_out
+	echo "RADIO outSignal 外層線路形成方式? V 992222">>$gui_out
+	echo "Tenting">>$gui_out
+	echo "2Cu">>$gui_out
+	echo "END">>$gui_out
+
+	echo "RADIO Job_UpDown 料號層名顯示在那邊? V 992222">>$gui_out
+	echo "UP">>$gui_out
+	echo "DOWN">>$gui_out
+	echo "END">>$gui_out
+
+	echo "RADIO cbtPin 增加川寶CBT工具孔嗎? V 992222">>$gui_out
+	echo "Yes">>$gui_out
+	echo "No">>$gui_out
+	echo "END">>$gui_out	
+	
+	echo "RADIO sort_drill 板邊增加鑽孔檢驗孔嗎? V 992222">>$gui_out
+	echo "Yes">>$gui_out
+	echo "No">>$gui_out
+	echo "END">>$gui_out
+		
+	echo "RADIO Show_Plated 顯示電鍍框尺寸GUI嗎? V 992222">>$gui_out
+	echo "Show">>$gui_out
+	echo "No">>$gui_out
+	echo "END">>$gui_out
+		
+	echo "RADIO innerBorder 內層壓合流膠方式? V 992222">>$gui_out
+	echo "Flow Line">>$gui_out
+	echo "Dots Array">>$gui_out
+	echo "END">>$gui_out
+	
+	echo "RADIO ExpHole 增加組合孔環形防爆孔? V 992222">>$gui_out
+	echo "Yes">>$gui_out
+	echo "No">>$gui_out
+	echo "END">>$gui_out
+	
+	echo "RADIO LayerSumWord 防焊文字層增加單雙字樣嗎? V 992222">>$gui_out
+	echo "Yes">>$gui_out
+	echo "No">>$gui_out
+	echo "END">>$gui_out
+	
+	echo "BG 656590">>$gui_out
+	echo "FG 000000">>$gui_out
+	echo "RADIO Exit_Script 不執行，離開? V 992222">>$gui_out
+	echo "No">>$gui_out
+	echo "Yes">>$gui_out
+	echo "END">>$gui_out
+	
+	echo "BG 959590">>$gui_out
+	echo "FG 000000">>$gui_out
+	echo "END">>$gui_out
+
+	####取得gui資料###
+	$guiFile $gui_out > $gui_input
+	source $gui_input
+	\rm $gui_out
+	\rm $gui_input
+	#endregion
+endif
+
+
+#region "判讀GUI選項結果"
+#後悔時刻
+if ($Exit_Script == 2) then
+	goto EXIT
+endif
+
+if ($Job_UpDown == 1) then
+	set Job_UpDown='up'
+else
+	set Job_UpDown='down'
+endif
+
+if ($sort_drill == 1) then
+	set sort_drill='yes'
+else
+	set sort_drill='no'
+endif
+
+set ch_step=0
+foreach check($gCOLstep_name)
+	if ($check == 'wpnl') then
+		set ch_step=1
+	endif
+end
+
+#刪除已存在的wpnl
+if ($ch_step == 1) then	
+	COM delete_entity,job=$JOB,type=step,name=wpnl
+endif
+
+if ($Step_DIR == 1) then
+	set Rotary='Horizontal'
+	else
+	set Rotary='Vertical'
+endif
+
+if ($outSignal == 1) then
+	set outSignal='Tenting'
+else
+	set outSignal='2Cu'
+endif
+#endregion
+
+
+#region "判斷此料號為幾層板及增加刪除所須之層名"
+set layer_pin = 0
+set layer_in = 0
+set sort_drl = 0
+
+foreach no($gROWrow)
+	#判斷層名是否已存在
+	switch ($gROWname[$no])		
+		case "pin":
+			set layer_pin = `echo "$no" | gbc`
+		breaksw
+		case "in":
+			set layer_in = `echo "$no" | gbc`
+		breaksw
+		case "sort_drl":
+			set sort_drl = `echo "$no" | gbc`
+		breaksw
+	endsw
+end
+
+#刪除已存在的layer=pin in
+if ($layer_pin != 0 || $layer_pin != 0) then
+	#後面行號先刪除
+	if (`echo "$layer_pin > $layer_in" | gbc`) then
+		COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$layer_pin" | gbc`
+		if (`echo "$layer_in != 0" | gbc`) then
+			COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$layer_in" | gbc`
+		endif
+	else
+		COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$layer_in" | gbc`
+		if (`echo "$layer_pin != 0" | gbc`) then
+			COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$layer_pin" | gbc`
+		endif		
+	endif
+endif
+if ($sort_drl != 0) then
+	COM matrix_delete_row,job=$JOB,matrix=matrix,row=`echo "$sort_drl" | gbc`
+endif
+
+#更新變數info
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+set silkSum = 0
+set solderSunm = 0
+set drillRow = 0
+set innerSum = 0
+
+foreach no($gROWrow)	
+	if ($gROWcontext[$no] == 'board') then
+		if ($gROWlayer_type[$no] == 'silk_screen' && `echo "$silkSum < 3" | gbc`) then
+			set silkSum = `echo "$silkSum + 1" | gbc`
+		endif
+		if ($gROWlayer_type[$no] == 'solder_mask' && `echo "$solderSunm < 3" | gbc`) then
+			set solderSunm = `echo "$solderSunm + 1" | gbc`
+		endif
+		if ($gROWlayer_type[$no] == 'drill') then
+			set drillRow = `echo "$no + 1" | gbc`
+		endif
+		if ($gROWside[$no] == 'inner') then
+			set innerSum = `echo "$innerSum + 1" | gbc`
+		endif		
+	endif
+end
+
+### 增加所需的層 ####
+if (`echo "$innerSum > 0" | gbc`) then		
+	COM matrix_insert_row,job=$JOB,matrix=matrix,row=$drillRow
+	COM matrix_add_layer,job=$JOB,matrix=matrix,layer=pin,row=$drillRow,context=board,type=drill,polarity=positive
+
+	COM matrix_insert_row,job=$JOB,matrix=matrix,row=$drillRow
+	COM matrix_add_layer,job=$JOB,matrix=matrix,layer=in,row=$drillRow,context=board,type=drill,polarity=positive
+endif
+COM matrix_insert_row,job=$JOB,matrix=matrix,row=1
+COM matrix_add_layer,job=$JOB,matrix=matrix,layer=sort_drl,row=1,context=misc,type=drill,polarity=positive
+#endregion
+
+
+#region "建立wpnl並自動排版"
+#####取得profile尺寸  計算XY可排幾片#####
+#set gPROF_LIMITSxmin = '0' 
+#set gPROF_LIMITSymin = '0' 
+#set gPROF_LIMITSxmax = '50'
+#set gPROF_LIMITSymax = '50'
+\rm $info
+set Sub_pnl=$gCOLstep_name[$Step_Name]
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t step -e $JOB/$Sub_pnl -d PROF_LIMITS
+source $info
+\rm $info
+
+#取得profile尺寸XY
+if ($Rotary == 'Vertical') then		
+	set xmin_dir = $gPROF_LIMITSymin
+	set xmax_dir = $gPROF_LIMITSymax
+	set ymin_dir = $gPROF_LIMITSxmin
+	set ymax_dir = $gPROF_LIMITSxmax
+else
+	set xmin_dir = $gPROF_LIMITSxmin
+	set xmax_dir = $gPROF_LIMITSxmax
+	set ymin_dir = $gPROF_LIMITSymin
+	set ymax_dir = $gPROF_LIMITSymax
+endif
+set pnlSize_x = `echo "$xmax_dir - $xmin_dir" | gbc`		
+set pnlSize_y = `echo "$ymax_dir - $ymin_dir" | gbc`
+
+#求XY可排板幾次
+set dirSum_X = 1
+set dirSum_Y = 1
+
+set i = 1
+while (`echo "(($pnlSize_x+$SR_Margin)*$i+$SR_Margin) < ($WorkSize_X-2*7.2)" | gbc`)		
+	set dirSum_X=$i
+	@ i ++
+end
+
+set i = 1
+while (`echo "(($pnlSize_y+$SR_Margin)*$i+$SR_Margin) < ($WorkSize_Y-2*7.2)" | gbc`)		
+	set dirSum_Y=$i
+	@ i ++
+end
+
+
+#顯示電鍍框尺寸GUI,決定是否繼續,不顯示小數點
+if ($Show_Plated == 1) then
+	set a = `echo "($WorkSize_X - ($dirSum_X * $pnlSize_x) - (($dirSum_X + 1) * $SR_Margin)) / 2" | gbc`
+	set b = `echo "($WorkSize_Y - ($dirSum_Y * $pnlSize_y) - (($dirSum_Y + 1) * $SR_Margin)) / 2" | gbc`
+	PAUSE "X=$dirSum_X : Y=$dirSum_Y : Plated_Side_X=$a mm : Plated_Side_Y=$b mm"
+endif
+
+#設定排版所需的變數
+set left_side = `echo "($WorkSize_X - ($dirSum_X * $pnlSize_x) - (($dirSum_X - 1) * $SR_Margin)) / 2" | gbc`
+set right_side = `echo "$WorkSize_X - ($dirSum_X * $pnlSize_x) - (($dirSum_X - 1) * $SR_Margin)-$left_side" | gbc`
+set top_side = `echo "($WorkSize_Y - ($dirSum_Y * $pnlSize_y) - (($dirSum_Y - 1) * $SR_Margin)) / 2" | gbc`
+set bot_side = `echo "$WorkSize_Y - ($dirSum_Y * $pnlSize_y) - (($dirSum_Y - 1) * $SR_Margin)-$top_side" | gbc`
+
+#排版
+COM create_entity,job=$JOB,is_fw=no,type=step,name=wpnl,db=,fw_type=form
+COM open_entity,job=$JOB,type=step,name=wpnl,iconic=no
+COM units,type=mm
+COM sr_auto,step=$Sub_pnl,num_mode=multiple,xmin=0,ymin=0,width=$WorkSize_X,height=$WorkSize_Y,panel_margin=0,\
+	step_margin=$SR_Margin,gold_plate=no,gold_side=right,orientation=$Rotary,evaluate=no,active_margins=yes,\
+	top_active=$top_side,bottom_active=$bot_side,left_active=$left_side,right_active=$right_side,\
+	step_margin_x=$SR_Margin,step_margin_y=$SR_Margin
+COM set_attribute,type=step,job=$JOB,name1=wpnl,name2=,name3=,attribute=.pnl_class,value=,units=mm
+COM set_attribute,type=step,job=$JOB,name1=wpnl,name2=,name3=,attribute=.pnl_pcb,value=$Sub_pnl,units=mm
+COM matrix_page_close,job=$JOB,matrix=matrix
+
+#endregion
+
+
+#region "更新排版等資訊"
+###取得wpnl排版參數,如下為出貨pnl的有效四個角落,CNC四個直角座標
+#set gSRxmin   = ('24'   )
+#set gSRymin   = ('22.5' )
+#set gSRxmax   = ('286'  )
+#set gSRymax   = ('390.5')
+\rm $info
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t step -e $JOB/wpnl -d SR
+source $info
+\rm $info
+
+###設定基準線中心點###
+#電鍍框中心(扣3 mm的值)
+set i=`echo "($SR_Margin-3)/2" | gbc`
+set left_PlatedCenter = `echo "($gSRxmin-$SR_Margin)/2-$i" | gbc`
+set right_PlatedCenter = `echo "$gSRxmax+$SR_Margin+($WorkSize_X-$gSRxmax-$SR_Margin)/2+$i" | gbc`
+set bottom_PlatedCenter = `echo "($gSRymin-$SR_Margin)/2-$i" | gbc`
+set top_PlatedCenter = `echo "$gSRymax+$SR_Margin+($WorkSize_Y-$gSRymax-$SR_Margin)/2+$i" | gbc`
+set DUL_SIG = '$'
+set JJ = 'JOB'
+set DD = 'DATE'
+set LL = 'LAYER'
+
+
+### 輸出及取得Genesis的資料wpnl ####
+# set gROWrow        = ('1'           '2'           '3'        '4'        '5'        '6')
+# set gROWname       = ('silkc'       'sc'          'cop'      'int1'     'int2'     'int3')
+# set gROWcontext    = ('board'       'misc'
+# set gROWlayer_type = ('silk_screen' 'solder_mask' 'signal'   'mixed'    'power_ground'    'solder_paste'    'drill'    'rout'   'document'
+# set gROWpolarity   = ('positive'    'negative'
+# set gROWside       = ('top'         'inner'    	'bottom
+# set gCOLcol       = ('1'    '2'    '3'   )
+# set gCOLstep_name = ('org'  'pcs'  'wpnl')
+
+\rm $info
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+#endregion
+
+
+#region "Y方向位置設定"
+#同心圓(方向起始點),大於6層板須等比加大位置20mil(0.5mm)
+if (`echo "$innerSum > 6" | gbc`) then
+	#同心圓
+	set downY1=`echo "$gSRymin+5+($innerSum-6)*0.5" | gbc`
+	set upY1=`echo "$gSRymax-5-($innerSum-6)*0.5" | gbc`
+	#漲縮分類光學點
+	set downY2=`echo "$downY1+5+($innerSum-6)*0.25" | gbc`
+	set upY1=`echo "$upY1-5-($innerSum-6)*0.25" | gbc`
+else
+	#同心圓
+	set downY1=`echo "$gSRymin+5" | gbc`
+	set upY1=`echo "$gSRymax-5" | gbc`
+	#漲縮分類光學點
+	set downY2=`echo "$downY1+5" | gbc`
+	set upY2=`echo "$upY1-5" | gbc`	
+endif
+
+#第二組合孔
+set downY3=`echo "$downY2+8" | gbc`
+set upY3=`echo "$upY2-8" | gbc`
+
+#ToolPin
+set downY4=`echo "$downY3+8" | gbc`
+set downY5=`echo "$downY4+5" | gbc`
+set upY4=`echo "$upY3-8" | gbc`
+
+#鑽孔尺寸檢查起始點
+set downY6=`echo "$downY5+5" | gbc`
+#endregion
+
+
+#region "鑽孔尺寸檢查及排序 , 只允許檢驗孔在X軸上 , X方向電鍍框>6"
+if (`echo "($gSRxmin-$SR_Margin) > 6" | gbc` && $sort_drill == 'yes') then
+	### 鑽孔尺寸檢查及排序 ####
+	set info_drl = $TMP/info_drl
+	set tmp_drill = $TMP/tmp_drill
+	set tmp_drl_sort = $TMP/tmp_drl_sort
+	set tmp_drl_ans = $TMP/tmp_drl_ans
+	\rm $info_drl $tmp_drill $tmp_drl_sort $tmp_drl_ans
+	
+	foreach no($gCOLcol)
+		if ($gCOLtype[$no] == 'step' && $gCOLstep_name[$no] != 'org' && $gCOLstep_name[$no] != 'wpnl') then
+			COM info,out_file=$info_drl,write_mode=replace,units=mm,args=-t layer -e $JOB/$gCOLstep_name[$no]/drl
+			source $info_drl
+			foreach drl($gTOOLdrill_size)
+				echo $drl >> $tmp_drill
+			end
+		endif
+	end
+	sort -n $tmp_drill > $tmp_drl_sort
+	
+	###移除孔徑6.5mm以上###
+	set drl_1 = 6500
+	set big_drl = 0		#最大刀具尺寸
+	set small_drl = 500		#最小刀具尺寸
+	set tmp_d1 = 0
+	foreach cfm(`cat $tmp_drl_sort`)
+		if ($cfm != $tmp_d1) then
+			if (`echo "$cfm < $drl_1" | gbc`) then
+				echo $cfm >> $tmp_drl_ans
+				set big_drl = `echo "$cfm/1000" | gbc`
+				set tmp_d1 = $cfm
+			endif
+			if (`echo "$cfm < $small_drl" | gbc`) then	
+				set small_drl = $cfm
+			endif
+		endif
+	end
+	set check_drl = `cat $tmp_drl_ans`	#檢驗孔排序儲存
+	\rm $info_drl $tmp_drill $tmp_drl_sort $tmp_drl_ans
+
+	### 增加檢驗孔 ####
+	set last_drl = 0
+	COM display_layer,name=sort_drl,display=yes,number=1
+	COM work_layer,name=sort_drl
+	
+	set Y = `echo "$downY6" | gbc`
+	foreach drl($check_drl)
+		set drl_size = `echo "$drl" | gbc`
+		set space = `echo "($drl_size+$last_drl)/2000+3.5" | gbc`
+		set Y = `echo "$space+$Y" | gbc`
+		if (`echo "$Y > $WorkSize_Y/2-20" | gbc` && `echo "$Y < $WorkSize_Y/2+20" | gbc`) then
+			set Y = `echo "$Y+15" | gbc`	#跳過Y/2+-20區域
+		endif
+		if (`echo "$Y > $WorkSize_Y-30" | gbc`) then
+			break
+		endif
+	
+		COM add_pad,attributes=no,x=$left_PlatedCenter,y=$Y,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		set last_drl = $drl_size
+	end
+
+	###檢驗孔複製到鑽孔層##
+	COM affected_layer,name=drl,mode=single,affected=yes
+	COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,dx=0,dy=0,size=0
+	COM affected_layer,name=drl,mode=single,affected=no	
+endif
+#endregion
+
+
+#region "產生symbol資料庫"
+#set innerBorder = 1	(1=銅面+流膠條  2=組膠豆)
+if ($innerBorder == 2) then
+	set info=$GENESIS_DIR/tmp/info
+	COM info,out_file=$info,write_mode=replace,units=mm,args=-t job -e $JOB
+	source $info
+	\rm $info
+	#判斷symbol是否存在
+	set w60YesNo = 'no'
+	set w61YesNo = 'no'
+	foreach no($gSYMBOLS_LIST)	
+		if ($no == 'z_wpnl_w60') then
+			set w60YesNo = 'yes'
+		endif
+		if ($no == 'z_wpnl_w61') then
+			set w61YesNo = 'yes'
+		endif		
+	end
+	
+	#刪除非常耗時
+	#COM delete_entity,job=$JOB,type=symbol,name=w61
+	
+	#產生symbol
+	if ($w60YesNo == 'no') then
+		COM create_entity,job=$JOB,is_fw=no,type=symbol,name=w60,db=,fw_type=form
+		COM open_entity,job=$JOB,type=symbol,name=w60,iconic=no		             
+		COM units,type=inch
+		COM work_layer,name=z_wpnl_w60
+		COM add_pad,attributes=no,x=0.09,y=0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=0.03,y=-0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=-0.03,y=0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=-0.09,y=-0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM editor_page_close
+	endif	
+	if ($w61YesNo == 'no') then
+		COM create_entity,job=$JOB,is_fw=no,type=symbol,name=w61,db=,fw_type=form
+		COM open_entity,job=$JOB,type=symbol,name=w61,iconic=no		             
+		COM units,type=inch
+		COM work_layer,name=z_wpnl_w61
+		COM add_pad,attributes=no,x=0.03,y=0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=0.09,y=-0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=-0.09,y=0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=-0.03,y=-0.03,symbol=r70,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM editor_page_close	
+	endif
+#END 產生symbol資料庫
+endif
+#endregion
+
+
+
+##################################################
+#### 電鍍框各層別 ########
+set innerEven=1	#奇偶數內層
+set mirror='no'
+set intNow=0	#第幾次內層
+foreach no($gROWrow)	
+	
+	if ($gROWcontext[$no] == 'board') then
+		#需工作的層別
+		COM display_layer,name=$gROWname[$no],display=yes,number=1
+		COM work_layer,name=$gROWname[$no]	
+		##判斷及設定字正字反##
+		switch ($gROWside[$no])		
+		case "top":
+			set mirror='no'
+		breaksw
+		case "inner":
+			if ($innerEven == 1) then	#奇數內層				
+				set innerEven = 2
+				set mirror='no'				
+			else						#偶數內層
+				set innerEven = 1
+				set mirror='yes'				
+			endif
+		breaksw
+		case "bottom":
+			set mirror='yes'
+		breaksw		
+		endsw		
+		
+		### 電鍍框 ####先設正片再轉極性		
+		if ($gROWlayer_type[$no] != 'silk_screen' && $gROWlayer_type[$no] != 'solder_paste' \
+			&& $gROWlayer_type[$no] != 'drill' &&  $gROWlayer_type[$no] != 'rout') then	
+			
+			if ($gROWlayer_type[$no] == 'solder_mask') then
+				set margin2 = `echo "-3" | gbc`
+				set margin1 = $SR_Margin
+			else
+				set margin2 = `echo "3" | gbc`
+				set margin1 = 0
+			endif
+
+			#region "電鍍框鋪銅"
+			#銅向外擴3mm-----負片,黑色代表銅面--二銅,防焊
+			#銅內縮3mm-------正片,白色代表銅面
+			#sr_margin=選擇step profile的邊緣多少距離不可餔銅
+			#step_margin排版間距,這裡是wpnl整個profile餔銅內縮多少,小於0表示餔銅外擴	
+			COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=,\
+				dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+
+			#先餔負性外擴
+			COM sr_fill,polarity=negative,step_margin=-3,step_max_dist=2540,sr_margin=$margin1,nest_sr=no,consider_feat=no,\
+				feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no			
+			
+			if ($gROWlayer_type[$no] != 'signal') then
+				#再餔正性內縮
+				if ($innerBorder == 1 || $gROWlayer_type[$no] == 'solder_mask') then
+					#銅面+流膠條
+					COM sr_fill,polarity=positive,step_margin=$margin2,step_max_dist=2540,sr_margin=$SR_Margin,nest_sr=no,\
+						consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no					
+				else					
+					#內層阻膠豆
+					if ($mirror == 'no') then
+						set w601='z_wpnl_w60'
+					else
+						set w601='z_wpnl_w61'
+					endif
+					
+					COM fill_params,type=pattern,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,\
+						symbol=$w601,dx=3.048,dy=3.048,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+					COM sr_fill,polarity=positive,step_margin=1.5,step_max_dist=300,sr_margin=3,nest_sr=no,\
+						consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no
+					COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=,\
+						dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+				endif
+			endif
+			
+			#如果二銅或電鍍金,再加外擴銅面
+			if ($outSignal != 'Tenting' && $gROWlayer_type[$no] == 'signal') then
+				COM sr_fill,polarity=positive,step_margin=-3,step_max_dist=2540,sr_margin=$SR_Margin,nest_sr=no,\
+					consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no				
+			endif
+			#endregion
+			
+	
+			if ($gROWside[$no] == 'inner' && $innerBorder == 1) then		
+				###內層流膠條###
+				#流膠條:交插(L1與L2)阻膠條且導膠槽設計於內層Core兩面交叉不要作對稱以利於
+				#內層蝕刻及黑化插框時造成破板及折版的不必要的報廢	
+				
+				#region "增加X上下邊的流膠條"
+				#X方向須幾個流膠條flowSum_X
+				set flowSum_X=`echo "$WorkSize_X/80-1" | gbc`
+				
+				##不要奇數流膠條
+				if (`echo "$flowSum_X % 2 == 1" | gbc`) then
+					set flowSum_X=`echo "$flowSum_X - 1" | gbc`
+				endif
+				
+				#每次位移尺寸
+				set flowPosistion=`echo "$WorkSize_X/($flowSum_X+1)" | gbc`
+				
+				#一次畫四條,所以迴圈數減半
+				set flowSum_X=`echo "$flowSum_X/2" | gbc`
+				
+				set i = 1
+				while (`echo "$i <= $flowSum_X" | gbc`)	
+					#設定座標
+					set Y_Down_e = `echo "$gSRymin-1.5" | gbc`
+					set Y_Down_s = 1.5
+					set Y_Up_e = `echo "$gSRymax+1.5" | gbc`
+					set Y_Up_s = `echo "$WorkSize_Y-1.5" | gbc`
+					set X_Left_e = `echo "$i*$flowPosistion" | gbc`
+					set X_Left_s = `echo "$X_Left_e+($gSRymin-3)/2" | gbc`
+					set X_Right_s = `echo "$WorkSize_X-$X_Left_s" | gbc`
+					set X_Right_e	= `echo "$WorkSize_X-$X_Left_e" | gbc`
+					
+					#X的in out對調,產生交叉的流膠條
+					if ($mirror == 'yes') then
+						set buf = $X_Left_s
+						set X_Left_s = $X_Left_e
+						set X_Left_e = $buf
+						set buf = $X_Right_s
+						set X_Right_s = $X_Right_e	
+						set X_Right_e = $buf
+					endif					
+					
+					#左下,由外向內畫直線
+					COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Down_s,xe=$X_Left_e,ye=$Y_Down_e,symbol=r3000,polarity=negative
+					#右下
+					COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Down_s,xe=$X_Right_e,ye=$Y_Down_e,symbol=r3000,polarity=negative		
+					#左上
+					COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Up_s,xe=$X_Left_e,ye=$Y_Up_e,symbol=r3000,polarity=negative					
+					#右上
+					COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Up_s,xe=$X_Right_e,ye=$Y_Up_e,symbol=r3000,polarity=negative
+					
+					@ i ++
+				end				
+				#endregion
+
+				#region "增加Y左右邊的流膠條"
+				#Y方向須幾個流膠條flowSum_Y
+				set flowSum_Y=`echo "$WorkSize_Y/80-1" | gbc`
+				
+				##不要奇數流膠條
+				if (`echo "$flowSum_Y % 2 == 1" | gbc`) then
+					set flowSum_Y=`echo "$flowSum_Y - 1" | gbc`
+				endif
+				
+				#每次位移尺寸
+				set flowPosistion=`echo "$WorkSize_Y/($flowSum_Y+1)" | gbc`
+				
+				#一次畫四條,所以迴圈數減半
+				set flowSum_Y=`echo "$flowSum_Y/2" | gbc`				
+
+				set i = 1
+				while (`echo "$i <= $flowSum_Y" | gbc`)						
+					#設定座標
+					set Y_Down_s = `echo "$i*$flowPosistion" | gbc`
+					set Y_Down_e = `echo "$Y_Down_s+($gSRxmin-3)/2" | gbc`					
+					set Y_Up_e = `echo "$WorkSize_Y-$Y_Down_e" | gbc`
+					set Y_Up_s = `echo "$WorkSize_Y-$Y_Down_s" | gbc`					
+					set X_Left_s = 1.5					
+					set X_Left_e = `echo "$gSRxmin-1.5" | gbc`
+					set X_Right_s = `echo "$WorkSize_X-1.5" | gbc`
+					set X_Right_e	= `echo "$gSRxmax+1.5" | gbc`
+					
+					#Y的in out對調,產生交叉的流膠條
+					if ($mirror == 'yes') then
+						set buf = $Y_Down_s
+						set Y_Down_s = $Y_Down_e
+						set Y_Down_e = $buf
+						set buf = $Y_Up_s
+						set Y_Up_s = $Y_Up_e	
+						set Y_Up_e = $buf
+					endif					
+					
+					#左下,由外向內畫直線
+					COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Down_s,xe=$X_Left_e,ye=$Y_Down_e,symbol=r3000,polarity=negative
+					#右下
+					COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Down_s,xe=$X_Right_e,ye=$Y_Down_e,symbol=r3000,polarity=negative		
+					#左上
+					COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Up_s,xe=$X_Left_e,ye=$Y_Up_e,symbol=r3000,polarity=negative					
+					#右上
+					COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Up_s,xe=$X_Right_e,ye=$Y_Up_e,symbol=r3000,polarity=negative
+					
+					@ i ++
+				end
+				#endregion
+
+				#region "增加四個角落的流膠條"
+				
+				#依據正反面錯開位置,避免破裂
+				if ($mirror == 'no') then
+					set Y_Down_s = `echo "$bottom_PlatedCenter+3" | gbc`
+					set Y_Down_e = `echo "$gSRymin" | gbc`	
+					set Y_Up_s = `echo "$top_PlatedCenter-3" | gbc`		
+					set Y_Up_e = `echo "$gSRymax" | gbc`
+					set X_Left_s = 	1.5	
+					set X_Left_e = `echo "$gSRxmin-1.5" | gbc`	
+					set X_Right_s = `echo "$WorkSize_X-1.5" | gbc`
+					set X_Right_e	= `echo "$gSRxmax+1.5" | gbc`
+				else
+					set Y_Down_s = 1.5
+					set Y_Down_e = `echo "$gSRymin-1.5" | gbc`	
+					set Y_Up_s = `echo "$WorkSize_Y-1.5" | gbc`
+					set Y_Up_e = `echo "$gSRymax+1.5" | gbc`
+					set X_Left_s = `echo "$left_PlatedCenter+3" | gbc`				
+					set X_Left_e = `echo "$gSRxmin" | gbc`
+					set X_Right_s = `echo "$right_PlatedCenter-3" | gbc`
+					set X_Right_e = `echo "$gSRxmax" | gbc`				
+				endif
+				
+				#左下,由外向內畫直線
+				COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Down_s,xe=$X_Left_e,ye=$Y_Down_e,symbol=r3000,polarity=negative
+				#右下
+				COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Down_s,xe=$X_Right_e,ye=$Y_Down_e,symbol=r3000,polarity=negative		
+				#左上
+				COM add_line,attributes=no,xs=$X_Left_s,ys=$Y_Up_s,xe=$X_Left_e,ye=$Y_Up_e,symbol=r3000,polarity=negative					
+				#右上
+				COM add_line,attributes=no,xs=$X_Right_s,ys=$Y_Up_s,xe=$X_Right_e,ye=$Y_Up_e,symbol=r3000,polarity=negative
+				#endregion
+
+			endif
+		endif	
+		#END 電鍍框
+
+		#region "增加料號名稱"
+		#先增加負性長方形區塊,再增加 JOB料號 LAYER層名
+		if ($Job_UpDown == 'up') then
+			set jobName_Y=`echo "$top_PlatedCenter-1.7" | gbc`		
+		else
+			set jobName_Y=`echo "$bottom_PlatedCenter-1.7" | gbc`	
+		endif
+		set jobName_X=`echo "$gSRxmax-75" | gbc`
+		set jobNameBottom_X=`echo "$jobName_X-1+27" | gbc`
+		set jobNameBottom_Y=`echo "$jobName_Y-0.8+2.5" | gbc`
+		if ($mirror == 'yes') then
+			set jobName_X=`echo "$gSRxmax-23" | gbc`
+		endif
+
+		if ($gROWlayer_type[$no] != 'drill') then
+			#文字底部區塊			
+			if ($gROWlayer_type[$no] != 'solder_mask') then
+				
+				if ($outSignal == '2Cu' && $gROWlayer_type[$no] == 'signal') then
+					set pos='negative'
+				else	
+					COM add_pad,attributes=no,x=$jobNameBottom_X,y=$jobNameBottom_Y,\
+						symbol=rect54000x5000,polarity=negative,angle=0,mirror=no,nx=1,ny=1,\
+						dx=0,dy=0,xscale=1,yscale=1
+					set pos='positive'	
+				endif
+			else
+				set pos='negative'	
+			endif
+			
+			#文字
+			COM add_text,attributes=no,type=string,x=$jobName_X,y=$jobName_Y,\
+				text=$DUL_SIG$DUL_SIG$JJ $DUL_SIG$DUL_SIG$LL,x_size=3.3,y_size=3.4,\
+				w_factor=1.25,polarity=$pos,angle=0,mirror=$mirror,fontname=standard
+		endif	
+		#endregion
+
+
+		#同心圓:請在板邊四角製作同心圓、便於做內層進料檢驗是否內層有層偏、及輔助鉚合後檢驗是否有
+		#		鉚偏現象、以降低壓合鉚偏而造成的報廢、亦可盡早釐清層偏發生站別。(如附圖一.圖二)
+		#		L2直徑30mil 每層環圓寬5mil 每層環距5mil(以此類推)
+		#光學點 :孔圓環寬應大於125mil . 實心光學點直徑需30mil
+
+
+		#region "增加靶孔"
+		set targetPad_X1=0
+		if (`echo "$innerSum > 0" | gbc`) then
+			#內層靶孔 間距60mm以上,座標設定
+			if (`echo "($WorkSize_X/4)<60" | gbc`) then
+				set targetPad_X1=`echo "($WorkSize_X-60)/2" | gbc`					
+			else
+				set targetPad_X1=`echo "$WorkSize_X/4" | gbc`				
+			endif			
+			set targetPad_X2=`echo "$WorkSize_X-$targetPad_X1" | gbc`	
+			
+			##增加靶孔##
+			if ($gROWlayer_type[$no] == 'drill' && $gROWname[$no] == 'pin') then
+				#pin層
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X2,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$top_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			endif
+			
+			#線路層
+			if ($gROWlayer_type[$no] == 'signal' || $gROWside[$no] == 'inner') then
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$bottom_PlatedCenter,symbol=r8636,polarity=negative,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X2,y=$bottom_PlatedCenter,symbol=r8636,polarity=negative,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$top_PlatedCenter,symbol=r8636,polarity=negative,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			endif 
+
+			if ($gROWside[$no] == 'inner') then
+				##第一孔				
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$bottom_PlatedCenter,symbol=donut_r5735x4935,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$bottom_PlatedCenter,symbol=donut_r3955x3155,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_line,attributes=no,xs=`echo "$targetPad_X1+1.8" | gbc`,ys=$bottom_PlatedCenter,xe=`echo "$targetPad_X1+3.6" | gbc`,ye=$bottom_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=`echo "$targetPad_X1-1.8" | gbc`,ys=$bottom_PlatedCenter,xe=`echo "$targetPad_X1-3.6" | gbc`,ye=$bottom_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X1,ys=`echo "$bottom_PlatedCenter+1.8" | gbc`,xe=$targetPad_X1,ye=`echo "$bottom_PlatedCenter+3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X1,ys=`echo "$bottom_PlatedCenter-1.8" | gbc`,xe=$targetPad_X1,ye=`echo "$bottom_PlatedCenter-3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$bottom_PlatedCenter,symbol=r762,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				##第二孔
+				COM add_pad,attributes=no,x=$targetPad_X2,y=$bottom_PlatedCenter,symbol=donut_r5735x4935,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X2,y=$bottom_PlatedCenter,symbol=donut_r3955x3155,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_line,attributes=no,xs=`echo "$targetPad_X2+1.8" | gbc`,ys=$bottom_PlatedCenter,xe=`echo "$targetPad_X2+3.6" | gbc`,ye=$bottom_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=`echo "$targetPad_X2-1.8" | gbc`,ys=$bottom_PlatedCenter,xe=`echo "$targetPad_X2-3.6" | gbc`,ye=$bottom_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X2,ys=`echo "$bottom_PlatedCenter+1.8" | gbc`,xe=$targetPad_X2,ye=`echo "$bottom_PlatedCenter+3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X2,ys=`echo "$bottom_PlatedCenter-1.8" | gbc`,xe=$targetPad_X2,ye=`echo "$bottom_PlatedCenter-3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_pad,attributes=no,x=$targetPad_X2,y=$bottom_PlatedCenter,symbol=r762,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				##第三孔
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$top_PlatedCenter,symbol=donut_r5735x4935,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$top_PlatedCenter,symbol=donut_r3955x3155,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_line,attributes=no,xs=`echo "$targetPad_X1+1.8" | gbc`,ys=$top_PlatedCenter,xe=`echo "$targetPad_X1+3.6" | gbc`,ye=$top_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=`echo "$targetPad_X1-1.8" | gbc`,ys=$top_PlatedCenter,xe=`echo "$targetPad_X1-3.6" | gbc`,ye=$top_PlatedCenter,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X1,ys=`echo "$top_PlatedCenter+1.8" | gbc`,xe=$targetPad_X1,ye=`echo "$top_PlatedCenter+3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_line,attributes=no,xs=$targetPad_X1,ys=`echo "$top_PlatedCenter-1.8" | gbc`,xe=$targetPad_X1,ye=`echo "$top_PlatedCenter-3.6" | gbc`,symbol=r508,polarity=positive
+				COM add_pad,attributes=no,x=$targetPad_X1,y=$top_PlatedCenter,symbol=r762,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			endif
+		endif
+		#endregion
+		
+
+		#region "設定底片ToolPin對位孔座標_X方向pin孔"
+		set X_too_short = 'no'
+		if (`echo "($gSRymin-$SR_Margin)>7" | gbc` && $gROWname[$no] != 'pin' &&\
+				$gROWname[$no] != 'd1' && $gROWname[$no] != '2nd') then
+			#一次增加9個PAD
+			set X1=`echo "$gSRxmin" | gbc`
+			set X2=`echo "$gSRxmin+5" | gbc`
+			set X3=`echo "$gSRxmin+10" | gbc`
+			set X4=`echo "$gSRxmax-5" | gbc`
+			set X4_offset=`echo "$X4-2" | gbc`
+			set X5=`echo "$gSRxmax" | gbc`
+			set X5_offset=`echo "$X5-2" | gbc`
+			
+			#設定symbols與polarity
+			if ($gROWlayer_type[$no] == 'drill') then
+				set symbol=('r3175')
+				set polarity=('positive')
+			else
+				set symbol=('s5000' 'donut_r4089.4x3327.4' 'donut_r3022.6x2514.6' 'r762')
+				
+				if ($gROWlayer_type[$no] == 'signal' && $outSignal == 'Tenting') then
+					set polarity=('positive' 'negative' 'negative' 'negative')
+				else
+					set polarity=('negative' 'positive' 'positive' 'positive')
+				endif
+			endif
+
+			#多層板且X寬度不足,靶孔與tool pin有重疊時的設定
+			set X_too_short = 'yes'		
+			if (`echo "$innerSum > 0" | gbc` && `echo "($targetPad_X1-$X1) < 15" | gbc`) then
+				set X_too_short = 'no'
+				if (`echo "($targetPad_X1-$X1) < 5" | gbc`) then
+					set X1=`echo "$targetPad_X1-5" | gbc`
+					set X5=`echo "$$targetPad_X2+7" | gbc`
+					set X5_offset=`echo "$X5-2" | gbc`
+				endif
+			endif			
+			
+			#限定特定鑽孔層名才可增加pin
+			if ($gROWlayer_type[$no] == 'drill' && $gROWname[$no] == 'drl' || $gROWname[$no] == 'in') then
+				set i=5
+			endif
+			
+			set i=1
+			while (`echo "$i <= 4" | gbc`)				
+				#X1
+				COM add_pad,attributes=no,x=$X1,y=$bottom_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$X1,y=$top_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				
+				#第三個i=4上面,不增加r762
+				if ($i != 4 && $X_too_short != 'no') then	
+					#X2
+					COM add_pad,attributes=no,x=$X2,y=$bottom_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X2,y=$top_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+					#X3
+					COM add_pad,attributes=no,x=$X3,y=$bottom_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					#X4
+					COM add_pad,attributes=no,x=$X4_offset,y=$bottom_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X4,y=$top_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				endif	
+				#X5
+				COM add_pad,attributes=no,x=$X5_offset,y=$bottom_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$X5,y=$top_PlatedCenter,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				if ($gROWlayer_type[$no] == 'drill') then
+					set i=5
+				else
+					@ i ++
+				endif	
+			end
+		endif
+		#endregion	
+	
+	
+		#region "設定底片ToolPin對位孔座標_Y方向pin孔"		
+		if (`echo "($gSRxmin-$SR_Margin)>7" | gbc` && $gROWname[$no] != 'pin') then
+		
+			#設定symbols與polarity			
+			if ($gROWlayer_type[$no] == 'drill') then
+				set symbol=('r3175')
+				set polarity=('positive')
+			else
+				set symbol=('s5000' 'donut_r4089.4x3327.4' 'donut_r3022.6x2514.6')			
+				if ($gROWlayer_type[$no] == 'signal' && $outSignal == 'Tenting') then
+					set polarity=('positive' 'negative' 'negative')
+				else
+					set polarity=('negative' 'positive' 'positive')
+				endif
+			endif	
+
+			set downY4_offset=`echo "$downY4+2" | gbc`
+
+			set i = 1
+			while (`echo "$i <= 3" | gbc`)
+
+					COM add_pad,attributes=no,x=$left_PlatedCenter,y=$downY4,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+					COM add_pad,attributes=no,x=$right_PlatedCenter,y=$downY4_offset,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1							
+						
+					COM add_pad,attributes=no,x=$left_PlatedCenter,y=$downY5,symbol=$symbol[$i],polarity=$polarity[$i],\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+							
+							
+					COM add_pad,attributes=no,x=$left_PlatedCenter,y=$upY4,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$right_PlatedCenter,y=$upY4,symbol=$symbol[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				if ($gROWlayer_type[$no] == 'drill') then
+					set i = 4
+				else
+					@ i ++
+				endif
+			end
+		endif	
+		#endregion	
+
+
+
+		#region "同心圓"
+		#起始donut_r30x20(mil)*25.4=公制,每一層內外尺寸各+20mil
+		#要補償值時(外+1  內-1),底部PAD=最後+30mil
+		#set downY1=`echo "$gSRymin+5" | gbc`
+		#set upY1=`echo "$gSRymxn-5" | gbc`
+		if (`echo "($gSRxmin-$SR_Margin)>7" | gbc` && $gROWname[$no] != 'pin' && $gROWname[$no] != 'in' \
+				&& $gROWlayer_type[$no] != 'silk_screen' && $gROWlayer_type[$no] != 'solder_mask'\
+				&& $innerSum != 0) then
+			
+			#設定底部PAD尺寸
+			set negPad=r`echo "($innerSum*20+30+30)*25.4" | gbc`
+			@ intNow ++	#第幾次內層	
+			set i=1
+			while (`echo "$i < 3" | gbc`)	
+				#設定symbols				
+				if ($gROWlayer_type[$no] == 'drill') then
+					set symbol=('' 'r2.54')
+					set polarity=('' 'positive')
+					set i = 2
+				else
+					if ($gROWlayer_type[$no] == 'signal') then
+						#外層
+						set symbol=('' $negPad)
+						if ($outSignal == 'Tenting') then
+							set polarity=('' 'positive')
+						else
+							set polarity=('' 'negative')
+						endif
+						set i = 2
+					else
+						#內層,2mil蝕刻補償
+						set b=`echo "($intNow*20-1)*25.4" | gbc`
+						set a=`echo "($intNow*20+10+1)*25.4" | gbc`
+						set symbol=($negPad donut_r$a'x'$b)
+						set polarity=('negative' 'positive')
+					endif
+				endif
+					
+				#左邊
+				COM add_pad,attributes=no,x=$left_PlatedCenter,y=$downY1,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				COM add_pad,attributes=no,x=$left_PlatedCenter,y=$upY1,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				#右邊
+				COM add_pad,attributes=no,x=$right_PlatedCenter,y=$downY1,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				COM add_pad,attributes=no,x=$right_PlatedCenter,y=$upY1,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				
+				@ i ++
+			end
+		endif	
+		#endregion
+
+				
+		#region "漲縮分類光學點"
+		#set downY2=`echo "$downY1+5" | gbc`
+		#set upY2=`echo "$upY1-5" | gbc`
+		if (`echo "($gSRxmin-$SR_Margin)>7" | gbc` && $gROWlayer_type[$no] == 'signal' \
+				|| $gROWside[$no] == 'inner') then
+		
+			set i=1
+			while (`echo "$i<3" | gbc`)	
+				#設定symbols
+				set symbol=("r3000" "r1000")
+
+				#設定極性
+				if ($gROWlayer_type[$no] == 'signal') then
+					#外層					
+					if ($outSignal == 'Tenting') then
+						set polarity=('positive' 'negative')
+					else
+						set polarity=('negative' 'positive')
+					endif
+				else
+					set polarity=('negative' 'positive')
+				endif
+
+				#左邊
+				COM add_pad,attributes=no,x=$left_PlatedCenter,y=$downY2,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$left_PlatedCenter,y=$upY2,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				#右邊
+				COM add_pad,attributes=no,x=$right_PlatedCenter,y=$downY2,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$right_PlatedCenter,y=$upY2,symbol=$symbol[$i],polarity=$polarity[$i],\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				
+				@ i ++
+			end
+		endif		
+		#endregion
+
+		
+		#region "增加噴錫掛勾孔"
+		if ($gROWlayer_type[$no] == 'drill' && `echo "$innerSum > 0" | gbc` && $gROWname[$no] == 'drl') then
+			if (`echo "($gSRxmin-$SR_Margin)>7" | gbc`) then
+				COM add_pad,attributes=no,x=`echo "$WorkSize_X/2" | gbc`,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=`echo "$WorkSize_X/2" | gbc`,y=$top_PlatedCenter,symbol=r3175,polarity=positive,\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1			
+			endif
+			if (`echo "($gSRymin-$SR_Margin)>7" | gbc`) then
+				COM add_pad,attributes=no,x=$left_PlatedCenter,y=`echo "$WorkSize_Y/2" | gbc`,symbol=r3175,polarity=positive,\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$right_PlatedCenter,y=`echo "$WorkSize_Y/2" | gbc`,symbol=r3175,polarity=positive,\
+					angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1			
+			endif			
+		
+		endif
+		#endregion
+	
+	
+		#請距原鉚釘孔20mm處設置備份鉚合退沖孔、以防止製造過程中鉚釘孔沖偏、或因其他因素
+		#防爆孔 :在距鉚釘孔邊周圍外推4mm處當中心點設置防爆孔且外層線路需開天窗(孔徑需設0.6mm)二銅蝕刻後
+		#        呈現non-p孔，方可防止鉚釘瞬間遇高溫時而產生膨脹或因鉚釘填膠不足導致外層P.P與銅箔的分層
+		#        ，防爆孔因再壓合後一鑽時鑽(如圖三)。亦可將鉚釘孔設置於壓合後成型外。(至少需整顆撈掉)
+
+		#組合孔需2組,1組6孔
+		if (`echo "($gSRxmin-$SR_Margin)>7" | gbc` && $gROWname[$no] != 'pin' && $gROWlayer_type[$no] != 'silk_screen' \
+				&& `echo "$innerSum>2" | gbc` ) then
+				
+			#region "增加組合孔"
+			#依次增加1=負PAD  2=donut_r(oct)  3=負r3276.6   4=r762  5=防爆孔
+			#設定座標
+			set X_Left=$left_PlatedCenter
+			set X_Right=$right_PlatedCenter
+			set X_Offset=`echo "$X_Right - 2" | gbc`
+			
+			set Y_Down1=$bottom_PlatedCenter
+			set Y_Up1=$top_PlatedCenter
+			set Y_Down2=$downY3
+			set Y_Up2=$upY3		
+			
+			set Y_Offset=`echo "$Y_Down2 + 2" | gbc`
+			set Y_Mid1=`echo "$WorkSize_Y/2 - 7.5" | gbc`
+			set Y_Mid2=`echo "$WorkSize_Y/2 + 7.5" | gbc`
+			
+			set polarity=('negative' 'positive' 'negative' 'positive')
+			#第一組組合孔
+			set symbol_1=('r6350' 'donut_r5080x3276.6' 'r3276.6' 'r762')
+			#第二組組合孔
+			set symbol_2=('r6350' 'oct5080x5080x1487.90' 'r3276.6' 'r762')
+			
+			#內層鑽孔層in只鑽第一組組合孔
+			if ($gROWlayer_type[$no] == 'drill') then			
+				set polarity=('positive')
+				set symbol_1=('r3175')
+			endif
+			
+			set i=1
+			while (`echo "$i < 5" | gbc`)				
+				if ($gROWside[$no] == 'inner') then
+					#第一組組合孔
+					#左邊
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Down1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Mid1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Up1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+					#右邊
+					COM add_pad,attributes=no,x=$X_Offset,y=$Y_Down1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Mid1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Up1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				
+					#第二組組合孔
+					#左邊
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Down2,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Mid2,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Up2,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+					#右邊
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Offset,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Mid2,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Up2,symbol=$symbol_2[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+				else if ($gROWlayer_type[$no] == 'drill' && $gROWname[$no] == 'in') then											
+					set i=1
+					#第一組組合孔
+					#左邊
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Down1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Mid1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Left,y=$Y_Up1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+					#右邊
+					COM add_pad,attributes=no,x=$X_Offset,y=$Y_Down1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Mid1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$X_Right,y=$Y_Up1,symbol=$symbol_1[$i],polarity=$polarity[$i],\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+					#只增加一次
+					set i=6										
+				endif					
+							
+				@ i ++
+			end
+			#endregion
+
+
+
+			#region "增加防爆孔"
+			#水平x=5.6,y=0
+			#22.5度x=5.173725,y=2.1430275
+			#45度x=3.9597975,y=3.9597975
+			#67.5度x=2.1430275,y=5.173725
+			#垂直x=0,y=5.6
+			if ($gROWname[$no] != 'in' && $ExpHole == 1) then
+				#設定symbol與polarity
+				if ($gROWlayer_type[$no] == 'drill') then
+					set symbol='r5.08'
+					set pos='positive'				
+				else if ($gROWlayer_type[$no] == 'solder_mask') then
+					set symbol='r1168'
+					set pos='positive'
+				else if ($gROWlayer_type[$no] == 'signal') then
+					set symbol='r914'
+					set pos='negative'
+				else if ($gROWside[$no] == 'inner') then
+					set symbol='r914'
+					set pos='negative'
+				endif					
+				
+				set i = 1
+				while (`echo "$i <= 12" | gbc`)
+					switch ($i)				
+						case "1":
+							#左下直角(1)x=$X_Left,y=$Y_Down1
+							set ExpH_X1=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X4=`echo "$X_Left + 2.143" | gbc`
+							set ExpH_X5=`echo "$X_Left + 0" | gbc`
+							set ExpH_Y1=`echo "$Y_Down1 + 0" | gbc`
+							set ExpH_Y2=`echo "$Y_Down1 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Down1 + 3.959" | gbc`
+							set ExpH_Y4=`echo "$Y_Down1 + 5.173" | gbc`
+							set ExpH_Y5=`echo "$Y_Down1 + 5.6" | gbc`							
+						breaksw	
+						case "2":
+							#左上直角(1)x=$X_Left,y=$Y_Up1
+							set ExpH_X1=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X4=`echo "$X_Left + 2.143" | gbc`
+							set ExpH_X5=`echo "$X_Left + 0" | gbc`
+							set ExpH_Y1=`echo "$Y_Up1 - 0" | gbc`
+							set ExpH_Y2=`echo "$Y_Up1 - 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Up1 - 3.959" | gbc`
+							set ExpH_Y4=`echo "$Y_Up1 - 5.173" | gbc`
+							set ExpH_Y5=`echo "$Y_Up1 - 5.6" | gbc`							
+						breaksw	
+						case "3":
+							#右下直角(1)x=$X_Offset,y=$Y_Down1
+							set ExpH_X1=`echo "$X_Offset - 5.6" | gbc`
+							set ExpH_X2=`echo "$X_Offset - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Offset - 3.959" | gbc`
+							set ExpH_X4=`echo "$X_Offset - 2.143" | gbc`
+							set ExpH_X5=`echo "$X_Offset - 0" | gbc`
+							set ExpH_Y1=`echo "$Y_Down1 + 0" | gbc`
+							set ExpH_Y2=`echo "$Y_Down1 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Down1 + 3.959" | gbc`
+							set ExpH_Y4=`echo "$Y_Down1 + 5.173" | gbc`
+							set ExpH_Y5=`echo "$Y_Down1 + 5.6" | gbc`							
+						breaksw	
+						case "4":
+							#右上直角(1)x=$X_Right,y=$Y_Up1
+							set ExpH_X1=`echo "$X_Right - 5.6" | gbc`
+							set ExpH_X2=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_X4=`echo "$X_Right - 2.143" | gbc`
+							set ExpH_X5=`echo "$X_Right - 0" | gbc`
+							set ExpH_Y1=`echo "$Y_Up1 - 0" | gbc`
+							set ExpH_Y2=`echo "$Y_Up1 - 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Up1 - 3.959" | gbc`
+							set ExpH_Y5=`echo "$Y_Up1 - 5.173" | gbc`
+							set ExpH_Y5=`echo "$Y_Up1 - 5.6" | gbc`							
+						breaksw	
+						case "5":
+							#左中下(1)x=$X_Left,y=$Y_Mid1
+							set ExpH_X1=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Mid1 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Mid1 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Mid1 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Mid1 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Mid1 - 3.959" | gbc`							
+						breaksw	
+						case "6":
+							#右中下(1)x=$X_Right,y=$Y_Mid1
+							set ExpH_X1=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Right - 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Mid1 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Mid1 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Mid1 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Mid1 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Mid1 - 3.959" | gbc`							
+						breaksw	
+						case "7":
+							#左下角(2)x=$X_Left,y=$Y_Down2
+							set ExpH_X1=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Down2 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Down2 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Down2 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Down2 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Down2 - 3.959" | gbc`							
+						breaksw	
+						case "8":
+							#左上角(2)x=$X_Left,y=$Y_Up2
+							set ExpH_X1=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Up2 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Up2 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Up2 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Up2 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Up2 - 3.959" | gbc`								
+						breaksw	
+						case "9":
+							#右上角(2)x=$X_Right,y=$Y_Offset
+							set ExpH_X1=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Right - 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Offset + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Offset + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Offset + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Offset - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Offset - 3.959" | gbc`							
+						breaksw	
+						case "10":
+							#右上角(2)x=$X_Right,y=$Y_Up2
+							set ExpH_X1=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Right - 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Up2 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Up2 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Up2 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Up2 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Up2 - 3.959" | gbc`							
+						breaksw	
+						case "11":
+							#左中上(2)x=$X_Left,y=$Y_Mid2
+							set ExpH_X1=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Left + 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Left + 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Left + 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Mid2 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Mid2 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Mid2 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Mid2 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Mid2 - 3.959" | gbc`								
+						breaksw	
+						case "12":
+							#右中上(2)x=$X_Right,y=$Y_Mid2
+							set ExpH_X1=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_X2=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X3=`echo "$X_Right - 5.6" | gbc`
+							set ExpH_X4=`echo "$X_Right - 5.173" | gbc`
+							set ExpH_X5=`echo "$X_Right - 3.959" | gbc`
+							set ExpH_Y1=`echo "$Y_Mid2 + 3.959" | gbc`
+							set ExpH_Y2=`echo "$Y_Mid2 + 2.143" | gbc`
+							set ExpH_Y3=`echo "$Y_Mid2 + 0" | gbc`
+							set ExpH_Y4=`echo "$Y_Mid2 - 2.143" | gbc`
+							set ExpH_Y5=`echo "$Y_Mid2 - 3.959" | gbc`							
+						breaksw	
+					endsw
+					
+					#增加防爆孔				
+					COM add_pad,attributes=no,x=$ExpH_X1,y=$ExpH_Y1,symbol=$symbol,polarity=$pos,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$ExpH_X2,y=$ExpH_Y2,symbol=$symbol,polarity=$pos,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$ExpH_X3,y=$ExpH_Y3,symbol=$symbol,polarity=$pos,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$ExpH_X4,y=$ExpH_Y4,symbol=$symbol,polarity=$pos,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$ExpH_X5,y=$ExpH_Y5,symbol=$symbol,polarity=$pos,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					@ i ++
+				end
+			endif
+			#endregion
+		
+		endif	
+
+
+		#region "川寶TOOL PIN"
+		if ($cbtPin == 1) then
+			if (`echo "$targetPad_X1 > ($gSRxmin+15+5)" | gbc`) then
+				set action='yes'
+			else
+				set action='no'
+			endif		
+
+			if (`echo "$WorkSize_Y > 305" | gbc` && `echo "$WorkSize_X > 160" | gbc` && `echo "$gSRxmin > 10" | gbc`  && $gROWname[$no] != 'pin' && $action != 'no') then
+				if ($gROWlayer_type[$no] == 'signal' || $gROWside[$no] == 'inner' || $gROWlayer_type[$no] == 'drill') then
+					#設定座標X_too_short
+					set CCD_Y1=`echo "$WorkSize_Y/2 - 128" | gbc`
+					set CCD_Y2=`echo "$CCD_Y1 + 255" | gbc`
+					set CCD_X1=`echo "$gSRxmin+15" | gbc`
+					set CCD_X2=`echo "$gSRxmax-15" | gbc`
+					
+					#設定PAD圖樣
+					if ($mirror == 'no') then
+						set symbol='r1000'
+						set sym='donut_r6000x4000'
+					else
+						set sym='donut_r6000x4000'
+						set symbol='donut_r2200x1600'
+					endif
+					
+					if ($gROWlayer_type[$no] == 'drill') then
+						set sym='r3175'
+						set symbol='r3175'
+					else #底部PAD
+						COM add_pad,attributes=no,x=$right_PlatedCenter,y=$CCD_Y1,symbol=r6000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$right_PlatedCenter,y=$CCD_Y2,symbol=r6000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+						COM add_pad,attributes=no,x=$CCD_X1,y=$bottom_PlatedCenter,symbol=s5000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+						COM add_pad,attributes=no,x=$CCD_X2,y=$bottom_PlatedCenter,symbol=s5000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+						COM add_pad,attributes=no,x=$CCD_X1,y=$top_PlatedCenter,symbol=s5000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+						COM add_pad,attributes=no,x=$CCD_X2,y=$top_PlatedCenter,symbol=s5000,polarity=negative,\
+							angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+					endif
+					
+					#Y長邊 位移的牙PIN
+					COM add_pad,attributes=no,x=$right_PlatedCenter,y=$CCD_Y1,symbol=$sym,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$right_PlatedCenter,y=$CCD_Y2,symbol=$sym,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1					
+						
+					#X短邊 CCD對位
+					COM add_pad,attributes=no,x=$CCD_X1,y=$bottom_PlatedCenter,symbol=$symbol,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$CCD_X2,y=$bottom_PlatedCenter,symbol=$symbol,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$CCD_X1,y=$top_PlatedCenter,symbol=$symbol,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$CCD_X2,y=$top_PlatedCenter,symbol=$symbol,polarity=positive,\
+						angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1		
+			
+				endif
+			endif
+		endif
+
+
+		#endregion				
+					
+
+		#region "顯示中文字"
+		#資料夾存在才可以增加在signal層上
+		#$gSRxmin+25開始文字(inch 左右距0.33  上下距0.2)
+		if ($gROWlayer_type[$no] == 'signal' && $LayerSumWord == 1) then
+			#文字判斷
+			set sym_screen2 = 'z_layer_screen'
+			switch ($silkSum)
+			case 1:		#單面文字
+				set sym_screen1 = 'z_side_one'		
+			breaksw	 
+			case 2:		#雙面文字
+				set sym_screen1 = 'z_side_two'
+			breaksw				
+			default:	#無文字					
+				set sym_screen1 = 'z_side_none'			
+			endsw
+		
+			#防焊判斷
+			set sym_solder2 = 'z_layer_solder'
+			switch ($solderSunm)
+			case 1:		#單面防焊
+				set sym_solder1 = 'z_side_one'
+			breaksw	 
+			case 2:		#雙面防焊
+				set sym_solder1 = 'z_side_two'
+			breaksw				
+			default:	#無防焊					
+				set sym_solder1 = 'z_side_none'			
+			endsw		
+
+			#判斷極性
+			if ($outSignal == 'Tenting') then
+				set polarity='positive'
+			else
+				set polarity='negative'
+			endif
+			
+			#設定座標(inch 左右距0.33  上下距0.2)
+			if ($mirror == 'no') then
+				set X_solder1 = `echo "$gSRxmin + 20" | gbc`
+				set X_solder2 = `echo "$X_solder1 + 0.33*25.4" | gbc`
+				set Y_solder = `echo "$gSRymax + $SR_Margin + 1.5" | gbc`
+				set X_screen1 =	`echo "$gSRxmin + 20" | gbc`
+				set X_screen2 = `echo "$X_screen1 + 0.33*25.4" | gbc`
+				set Y_screen =	`echo "$Y_solder + 0.16*25.4" | gbc`			
+			else
+				set X_solder1 = `echo "$gSRxmin + 20 + 17" | gbc`
+				set X_solder2 = `echo "$X_solder1 - 0.33*25.4" | gbc`
+				set Y_solder = `echo "$gSRymax + $SR_Margin + 1.5" | gbc`
+				set X_screen1 =	`echo "$gSRxmin + 20 + 17" | gbc`
+				set X_screen2 = `echo "$X_screen1 - 0.33*25.4" | gbc`
+				set Y_screen =	`echo "$Y_solder + 0.16*25.4" | gbc`				
+			endif
+
+			#判斷檔案存在與否,及是否可以複製
+			set checkDir = 1
+			
+			if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_side_two") then
+				#雙面的檔案不存在
+				set checkDir = 0
+				if ( -d "$GENESIS_DIR/sys/scripts/backData/z_side_two") then
+					#複製檔案
+					cp -r "$GENESIS_DIR/sys/scripts/backData/z_side_two" "$GENESIS_DIR/fw/lib/symbols/z_side_two"
+					set checkDir = 1
+				endif
+			endif
+
+			if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_side_one") then
+				#單面的檔案不存在
+				set checkDir = 0
+				if ( -d "$GENESIS_DIR/sys/scripts/backData/z_side_one") then
+					#複製檔案
+					cp -r "$GENESIS_DIR/sys/scripts/backData/z_side_one" "$GENESIS_DIR/fw/lib/symbols/z_side_one"
+					set checkDir = 1
+				endif
+			endif
+			
+			if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_side_none") then
+				#無的檔案不存在
+				set checkDir = 0
+				if ( -d "$GENESIS_DIR/sys/scripts/backData/z_side_none") then
+					#複製檔案
+					cp -r "$GENESIS_DIR/sys/scripts/backData/z_side_none" "$GENESIS_DIR/fw/lib/symbols/z_side_none"
+					set checkDir = 1
+				endif
+			endif
+			
+			if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_layer_screen") then
+				#文字的檔案不存在
+				set checkDir = 0
+				if ( -d "$GENESIS_DIR/sys/scripts/backData/z_layer_screen") then
+					#複製檔案
+					cp -r "$GENESIS_DIR/sys/scripts/backData/z_layer_screen" "$GENESIS_DIR/fw/lib/symbols/z_layer_screen"
+					set checkDir = 1
+				endif
+			endif
+			
+			if ( ! -d "$GENESIS_DIR/fw/lib/symbols/z_layer_solder") then
+				#防焊的檔案不存在
+				set checkDir = 0
+				if ( -d "$GENESIS_DIR/sys/scripts/backData/z_layer_solder") then
+					#複製檔案
+					cp -r "$GENESIS_DIR/sys/scripts/backData/z_layer_solder" "$GENESIS_DIR/fw/lib/symbols/z_layer_solder"
+					set checkDir = 1
+				endif
+			endif
+			
+			if ($checkDir == 1) then
+				#文字
+				COM add_pad,attributes=no,x=$X_screen1,y=$Y_screen,symbol=$sym_screen1,polarity=$polarity,\
+					angle=0,mirror=$mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$X_screen2,y=$Y_screen,symbol=$sym_screen2,polarity=$polarity,\
+					angle=0,mirror=$mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				
+				#防焊
+				COM add_pad,attributes=no,x=$X_solder1,y=$Y_solder,symbol=$sym_solder1,polarity=$polarity,\
+					angle=0,mirror=$mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1				
+				COM add_pad,attributes=no,x=$X_solder2,y=$Y_solder,symbol=$sym_solder2,polarity=$polarity,\
+					angle=0,mirror=$mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+			endif
+			
+		endif
+		#endregion
+
+				
+		#region "二鑽,增加4個pin孔"
+		if ($gROWname[$no] == '2nd' && $gROWlayer_type[$no] == 'drill') then
+			#增加4個pin孔
+			COM add_pad,attributes=no,x=$X1,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X5,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X1,y=$top_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X5,y=$top_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		endif
+		#endregion
+	
+		#region "一鑽,移動4個pin孔"
+		if ($gROWname[$no] == 'd1' && $gROWlayer_type[$no] == 'drill') then
+			#增加4個pin孔
+			COM add_pad,attributes=no,x=$X1,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X5,y=$bottom_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X1,y=$top_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$X5,y=$top_PlatedCenter,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			#刪除drl的這4個pin孔
+			COM display_layer,name=drl,display=yes,number=2
+			COM work_layer,name=drl		
+			COM sel_single_feat,operation=select,x=$X1,y=$bottom_PlatedCenter,tol=,cyclic=no
+			COM sel_single_feat,operation=select,x=$X5,y=$bottom_PlatedCenter,tol=,cyclic=yes
+			COM sel_single_feat,operation=select,x=$X1,y=$top_PlatedCenter,tol=,cyclic=yes
+			COM sel_single_feat,operation=select,x=$X5,y=$top_PlatedCenter,tol=,cyclic=yes
+			COM sel_delete
+			COM display_layer,name=$gROWname[$no],display=yes,number=1
+			COM work_layer,name=$gROWname[$no]			
+		endif
+		#endregion
+
+		
+		#region "將檢驗層複製到各層"
+		if ($sort_drill == 'yes' && $gROWlayer_type[$no] != 'drill' && $gROWlayer_type[$no] != 'silk_screen' && \
+				$gROWlayer_type[$no] != 'solder_mask' && $gROWlayer_type[$no] != 'solder_paste' && $gROWlayer_type[$no] != 'rout') then
+			COM display_layer,name=sort_drl,display=yes,number=2
+			COM work_layer,name=sort_drl
+			COM sel_copy_other,dest=layer_name,target_layer=$gROWname[$no],invert=yes,dx=0,dy=0,size=254
+			COM display_layer,name=sort_drl,display=no,number=2
+		endif
+		#endregion
+
+		
+		#region "轉極性與個層別一致"
+		if ($gROWpolarity[$no] == 'negative') then
+			COM sel_invert
+		endif
+		#endregion
+	
+	
+		COM display_layer,name=$gROWname[$no],display=no,number=1
+	endif 	
+	#board結束
+	
+	
+end		
+#foreach結束
+	
+
+### 刪除層 ####
+COM matrix_delete_row,job=$JOB,matrix=matrix,row=1
+
+
+EXIT:
+

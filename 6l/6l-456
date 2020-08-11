@@ -1,0 +1,129 @@
+COM zoom_home
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee-1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM affected_layer,name=int2,mode=single,affected=yes
+COM affected_layer,name=int4,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=0
+COM affected_layer,name=int4,mode=all,affected=no
+COM display_layer,name=55b,display=no,number=1
+COM display_layer,name=55a,display=yes,number=1
+COM work_layer,name=55a
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM affected_layer,name=int1,mode=single,affected=yes
+COM affected_layer,name=int3,mode=single,affected=yes
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=0
+COM display_layer,name=55a,display=no,number=1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_contourize,accuracy=6.35,break_to_islands=yes,clean_hole_size=76.2,\
+clean_hole_mode=x_and_y
+COM affected_layer,name=int1,mode=single,affected=no
+COM affected_layer,name=int3,mode=single,affected=no
+COM affected_layer,name=int2,mode=single,affected=yes
+COM affected_layer,name=int4,mode=single,affected=yes
+COM filter_set,filter_name=popup,update_popup=no,feat_types=pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc\;text
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive\;negative
+COM filter_set,filter_name=popup,update_popup=no,include_syms=coffee-1
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_contourize,accuracy=6.35,break_to_islands=yes,clean_hole_size=76.2,\
+clean_hole_mode=x_and_y
+COM filter_reset,filter_name=popup
+COM affected_layer,name=int4,mode=all,affected=no
+COM units,type=inch
+
+
+### 輸出及取得Genesis的資料 ####
+set info=$GENESIS_TMP/t1
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+set GBCF="$GENESIS_DIR/e$GENESIS_VER/misc/gbc -l"
+#COM open_entity,job=$job,type=matrix,name=matrix,iconic=no
+set i=0
+foreach no($gROWrow)
+    if ($gROWname[$no] == 'int1-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+    if ($gROWname[$no] == 'int2-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == 'int3-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == 'int4-158') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55a') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55a+++') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55b') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+	if ($gROWname[$no] == '55b+++') then
+		set j=`echo "$i+$no" | $GBCF` 
+		COM matrix_delete_row,job=$job,matrix=matrix,row=$j
+		set i=`echo "$i-1" | $GBCF` 
+	endif
+end
+
+
+COM matrix_refresh,job=$job,matrix=matrix
+COM matrix_page_close,job=$job,matrix=matrix

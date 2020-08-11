@@ -1,0 +1,57 @@
+#!/bin/csh
+#region "說明"
+#MOUSE  [  p | r ]  <  displayed_message  >
+#傳回值:
+#$MOUSEANS  ------以 (x y) & ( x1 y1 x2 y2)方式傳回
+#Example : 
+#    MOUSE p  Click on feature to be deleted
+#    set feature = ( $MOUSEANS )
+#	set MouseX = $feature[1]
+#	set MouseY = $feature[2]
+#echo “scale = 3;3.5 + 4.5” |bc 	
+#endregion
+
+set layerName = 'smd'
+COM info,args=-t layer -e $JOB/$STEP/$layerName -d FEATURES \
+-o select, out_file=$GENESIS_DIR/tmp/t1, write_mode=replace
+
+### Layer - li features data ###
+#P 0.6922845 0.5510502 s30 P 0 0 N
+#P 0.7614606 0.5568149 s30 P 0 0 N
+#P 0.7758722 0.4847565 s30 P 0 0 N
+#P   X座標     Y座標     PAD形狀
+
+
+1.選擇區域
+2.選擇垂直或水平
+3.零件名稱
+
+
+
+MOUSE r retangle
+    set feature = ( $MOUSEANS )
+	set X1 = $feature[1]
+	set Y1 = $feature[2]
+	set X2 = $feature[3]
+	set Y2 = $feature[4]
+
+PAUSE "X1=$X1,Y1=$Y1,X2=$X2,Y2=$Y2"
+
+COM filter_area_strt
+COM filter_area_xy,x=28.1530675,y=22.0616175
+COM filter_area_xy,x=33.9665175,y=17.80534
+COM filter_area_end,layer=,filter_name=popup,operation=select,area_type=rectangle,inside_area=yes,intersect_area=no,lines_only=no,ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+
+COM display_layer,name=li,display=no,number=1
+COM display_layer,name=li,display=yes,number=1
+COM work_layer,name=li
+COM display_layer,name=sc,display=yes,number=2
+COM snap_layer,name=sc
+COM work_layer,name=sc
+COM work_layer,name=li
+
+COM add_pad,attributes=no,x=0.7297549213,y=0.2282286417,symbol=rect30x50,\
+	polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+
+
+EXIT:

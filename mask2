@@ -1,0 +1,5 @@
+COM chklist_single,action=frontline_dfm_smo,show=yes
+COM chklist_cupd,chklist=frontline_dfm_smo,nact=1,params=((pp_layer=.affected)(pp_min_clear=2)(pp_opt_clear=2)(pp_min_cover=2.2)(pp_opt_cover=2.2)(pp_min_bridge=4)(pp_opt_bridge=4)(pp_selected=Selected)(pp_use_mask=Yes)(pp_use_shave=Yes)(pp_fix_coverage=PTH;Via;NPTH;SMD)(pp_fix_bridge=PTH;Via;NPTH;SMD)(pp_clear_coverage_comp=50)(pp_clear_bridge_comp=100)(pp_smd_pth_bridge_comp=50)(pp_smd_via_bridge_comp=50)(pp_smd_npth_bridge_comp=50)(pp_partial=)(pp_ignore_types=)(pp_ignore_attrs=)),\
+mode=regular
+COM chklist_run,chklist=frontline_dfm_smo,nact=1,area=profile
+COM chklist_close,chklist=frontline_dfm_smo,mode=hide

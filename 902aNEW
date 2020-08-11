@@ -1,0 +1,503 @@
+#!/bin/csh
+#================================================================
+# Written by Claudio Bellistri
+# Modified by Philippe Vanthuyne
+# Modified by Paolo Romanut
+#      Script support r0 dcode in PCB level for plot stamps. 
+#
+#
+#================================================================
+#set echo
+
+set create_sub_directory = yes  # valid options: yes/no
+# set zero_margin = 80
+# 80 can not rot small panel  
+set zero_margin = 10
+set out_ref_name = "ref"
+set out_outer_name = "layer"
+set ss_zero_dcode_sprint_8 = "226" # Set "" if you don't have Sprint-8 machine
+#----------------------------------------------------------------------------------
+#we dont need the sprint100
+#set ss_zero_dcode_sprint_100 = "227" # Set "" if you don't have Sprint-100 machine
+set ss_zero_dcode_sprint_100 = ""
+set ss_align_dcode = "233"
+
+
+if (`uname` == "WINDOWS_NT") then 
+	set output_dir = "C:/newprint_output"   # Windows output directory (change it before start the script)
+	alias awk gawk
+else
+	set output_dir = "/home/genesis/inkjet_jobs/automnt_jobs" # Linux output directory (change it before start the script)
+endif
+
+set gui_in = $GENESIS_TMP/gui_in.$$
+set gui_out = $GENESIS_TMP/gui_out.$$
+
+if ($ss_zero_dcode_sprint_8 != "" && $ss_zero_dcode_sprint_100 != "") then
+echo "WIN 100 100"					>  $gui_in
+echo "BG 004099"					>> $gui_in
+echo "FG 000000"					>> $gui_in
+echo "FONT tbr24"					>> $gui_in
+echo "LABEL Output SilkScreen"			>> $gui_in
+echo "FONT tbr18"					>> $gui_in
+echo "BG 006099"					>> $gui_in
+echo "LABEL Output files "				>> $gui_in
+echo "RADIO sprinttype ' '  H 1 990000"		>> $gui_in
+echo "HiPrint"					>> $gui_in
+echo "Sprint-100"					>> $gui_in 
+echo "END"						>> $gui_in 
+echo "BG 004099"					>> $gui_in
+echo "CLABEL OK"					>> $gui_in
+	gui $gui_in > $gui_out
+	source $gui_out
+	rm $gui_in $gui_out
+
+if ($sprinttype == 3) exit
+if ($sprinttype == 1) set ss_zero_dcode = $ss_zero_dcode_sprint_8
+if ($sprinttype == 2) set ss_zero_dcode = $ss_zero_dcode_sprint_100
+endif
+
+if ($create_sub_directory == yes) then
+	set output_dir = $output_dir/$JOB
+	mkdir $output_dir
+endif
+
+if ($ss_zero_dcode_sprint_8 == "") then
+set ss_zero_dcode = $ss_zero_dcode_sprint_100
+set ss_zero_dcode_sprint_8 = "999" 
+endif
+
+if ($ss_zero_dcode_sprint_100 == "") then
+set ss_zero_dcode = $ss_zero_dcode_sprint_8
+set ss_zero_dcode_sprint_100 = "999"
+endif
+
+set ss_top_list = ()
+set ss_bot_list = ()
+set ss_dil_num  = 0
+
+DO_INFO -t matrix -e $JOB/matrix -d ROW
+
+set i = 1
+
+while ($i <= $#gROWname)
+
+	echo $gROWlayer_type[$i] $gROWcontext[$i] $gROWside[$i]
+	
+	if ($gROWlayer_type[$i] == "silk_screen" && $gROWcontext[$i]  == "board" && $gROWside[$i]  == "top") set ss_top_list = ($ss_top_list $gROWname[$i])
+	if (($gROWlayer_type[$i] == "signal" || $gROWlayer_type[$i] == "power_ground" || $gROWlayer_type[$i] == "mixed") && $gROWcontext[$i]  == "board" && $gROWside[$i]  == "top") set outer_top = $gROWname[$i]
+
+	if ($gROWlayer_type[$i]  == "silk_screen" && $gROWcontext[$i]  == "board" && $gROWside[$i]  == "bottom") set ss_bot_list = ($ss_bot_list $gROWname[$i])
+	if (($gROWlayer_type[$i] == "signal" || $gROWlayer_type[$i] == "power_ground" || $gROWlayer_type[$i] == "mixed") && $gROWcontext[$i]  == "board" && $gROWside[$i]  == "bottom") set outer_bot = $gROWname[$i]
+
+	if (($gROWlayer_type[$i] == "drill") && $gROWcontext[$i]  == "board" ) then
+			 set outer_drill = $gROWname[$i]
+			@ ss_dil_num ++
+			
+	endif
+	
+	@ i ++
+end
+	
+echo "WIN 100 100"						>  $gui_in
+echo "FONT tbr24"						>> $gui_in
+echo "LABEL Automatic SilkScreen Output"			>> $gui_in
+echo "FONT tbr18"						>> $gui_in
+if ($#ss_top_list > 1) then
+	echo "LABEL Multiple SilkScreen layers found"		>> $gui_in
+	echo "LABEL Select TOP SilkScreen to process"		>> $gui_in
+	echo "LIST ss_top_list 5 S 1"				>> $gui_in
+	foreach sstop ($ss_top_list)
+		echo $sstop					>> $gui_in
+	end
+	echo "END"						>> $gui_in
+endif
+	COM sel_copy_other,dest=layer_name,target_layer=$out_ref_name,invert=no,\
+	dx=0,dy=0,size=0
+
+if ($#ss_bot_list > 1) then
+	echo "LABEL Multiple SilkScreen layers found"		>> $gui_in
+	echo "LABEL Select BOTTOM SilkScreen to process"	>> $gui_in
+	echo "LIST ss_bot_list 5 S 1"				>> $gui_in
+	foreach ssbot ($ss_bot_list)
+		echo $ssbot					>> $gui_in
+	end
+	echo "END"						>> $gui_in
+endif
+
+if ($#ss_top_list > 1 || $#ss_bot_list > 1) then
+	gui $gui_in > $gui_out
+	source $gui_out ; rm $gui_in $gui_out
+endif
+
+COM units,type=mm
+
+foreach ss_layer ($ss_top_list $ss_bot_list)
+
+	echo $STEP
+	COM open_entity,job=$JOB,type=step,name=$STEP,iconic=no
+	AUX set_group,group=$COMANS
+	echo $STEP
+	echo $ss_layer
+
+	COM display_layer,name=$ss_layer,display=yes,number=1
+	COM work_layer,name=$ss_layer
+
+	COM flatten_layer,source_layer=$ss_layer,target_layer=$ss_layer"_flat"
+#	COM copy_layer,source_job=$JOB,source_step=$STEP,source_layer=$ss_layer,dest=layer_name,dest_layer=$ss_layer"_flat",mode=replace,invert=no
+
+ 	set out_dir = $ss_layer
+	set out_layer_name = $ss_layer
+	set ss_layer = $ss_layer"_flat"
+ 
+	VOF
+	COM delete_layer,layer=$out_ref_name
+	VON
+	#
+	# resetting the affected layers
+	#
+      	COM affected_layer,name=,mode=all,affected=no
+	COM display_layer,name=$ss_layer,display=yes,number=1
+	COM work_layer,name=$ss_layer
+
+	# Slects all Pads in $ss_layer
+	# --------------------------------------------------------------------------------------------------------
+	COM filter_reset,filter_name=popup
+	COM filter_set,filter_name=popup,update_popup=no,feat_types=line
+	COM filter_set,filter_name=popup,update_popup=no,include_syms=r0
+	COM filter_area_strt
+	COM filter_area_end,layer=,filter_name=popup,operation=select,area_type=none,inside_area=no,intersect_area=no
+	COM filter_reset,filter_name=popup
+	COM filter_set,filter_name=popup,update_popup=no,feat_types=pad
+	COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+	COM filter_area_strt
+	COM filter_area_end,layer=,filter_name=popup,operation=select,area_type=none,inside_area=no,intersect_area=no
+	COM sel_copy_other,dest=layer_name,target_layer=$out_ref_name"_tmp",invert=no,\
+	dx=0,dy=0,size=0
+      	COM affected_layer,name=,mode=all,affected=no
+	COM display_layer,name=$out_ref_name"_tmp",display=yes,number=1
+	COM work_layer,name=$out_ref_name"_tmp"
+	#COM sel_break_level,attr_mode=retain 
+	COM filter_reset,filter_name=popup
+	COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad
+	COM filter_set,filter_name=popup,update_popup=no,include_syms=r0
+	COM filter_area_strt
+	COM filter_area_end,layer=,filter_name=popup,operation=select,\
+	area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+	ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+
+	# Copy R0 all pads from ref_tmp to a ref layer
+	# ----------------------------------------
+	COM get_select_count
+	if ($COMANS == 0) then
+		PAUSE NO R0 FOUND ON LAYER $ss_layer
+		continue
+	endif
+	
+	COM sel_copy_other,dest=layer_name,target_layer=$out_ref_name,invert=no,\
+	dx=0,dy=0,size=0
+
+	VOF
+	COM delete_layer,layer=$out_ref_name"_tmp"
+	VON
+
+	# Work on ref layer 
+	# -----------------
+	COM display_layer,name=$ss_layer,display=no,number=1
+	COM display_layer,name=$out_ref_name,display=yes,number=1
+	COM work_layer,name=$out_ref_name
+
+	DO_INFO -t step -e $JOB/$STEP -d PROF_LIMITS , units=mm
+	set zero_area_bot = `echo $gPROF_LIMITSymin $zero_margin | awk '{print int($1 + $2)}'`
+	set zero_area_top = `echo $gPROF_LIMITSymax $zero_margin | awk '{print int($1 - $2)}'`
+	set zero_area_left = `echo $gPROF_LIMITSxmin $zero_margin | awk '{print int($1 + $2)}'`
+	set zero_area_right = `echo $gPROF_LIMITSxmax $zero_margin | awk '{print int($1 - $2)}'`
+	set pan_xmin = `echo $gPROF_LIMITSxmin | awk '{print int($1)}'`
+	set pan_ymin = `echo $gPROF_LIMITSymin | awk '{print int($1)}'`
+	set pan_xmax = `echo $gPROF_LIMITSxmax | awk '{print int($1)}'`
+	set pan_ymax = `echo $gPROF_LIMITSymax | awk '{print int($1)}'`
+		
+	COM info,out_file=$GENESIS_TMP/ss_ref_layer,write_mode=replace,units=mm, args= -t layer -e $JOB/$STEP/$out_ref_name -d FEATURES
+	set number_of_targets = `grep "out_flag="$ss_align_dcode $GENESIS_TMP/ss_ref_layer | wc -l`
+	set zero_coord_x = `grep "out_flag="$ss_zero_dcode $GENESIS_TMP/ss_ref_layer | cut -d" " -f2 | cut -d"." -f1`
+	set zero_coord_y = `grep "out_flag="$ss_zero_dcode $GENESIS_TMP/ss_ref_layer | cut -d" " -f3 | cut -d"." -f1`
+	
+	#if ($number_of_targets != 3) then
+        if ($number_of_targets > 4) then
+		PAUSE $number_of_targets Alignment Targets defined ON LAYER $ss_layer (must define max 4 targets)
+		exit
+	endif
+	
+	if ($#zero_coord_x > 1) then
+		PAUSE Too many Origin R0 FOUND ON LAYER $ss_layer
+		exit
+	else if ($zero_coord_x == "") then
+		PAUSE NO Origin R0 FOUND ON LAYER $ss_layer
+		exit
+	endif
+
+	# Retrieveing out_flag value from r0 pads but adds a "box" prefix in case the out_break attribute is present
+	#===========================================================================================================
+	set ss_flattened_dcode_list = `awk -F= '/out_flag/ { if ($0 !~ /out_break/) {print $NF} else {print "box"$NF}}' $GENESIS_TMP/ss_ref_layer`
+	set ss_flattened_angle_list = `awk '/out_flag/ { if ($1 == "#P") {print $7} else {print "0"}}' $GENESIS_TMP/ss_ref_layer`
+	
+	set mac = ()
+	# Zero point on angle of panel (only Sprint 100)
+	if ($zero_coord_x == $pan_xmin && $zero_coord_y == $pan_ymin) then
+		set out_rot = 0
+		set mac = 100
+		set bot_0x = $gPROF_LIMITSxmax
+		set bot_0y = $gPROF_LIMITSymin
+	else	if ($zero_coord_x == $pan_xmax && $zero_coord_y == $pan_ymin) then
+		set out_rot = 90
+		set mac = 100
+		set bot_0x = $gPROF_LIMITSxmax
+		set bot_0y = $gPROF_LIMITSymax
+	else	if ($zero_coord_x == $pan_xmax && $zero_coord_y == $pan_ymax) then
+		set out_rot = 180
+		set mac = 100
+		set bot_0x = $gPROF_LIMITSxmin
+		set bot_0y = $gPROF_LIMITSymax
+	else	if ($zero_coord_x == $pan_xmin && $zero_coord_y == $pan_ymax) then
+		set out_rot = 270
+		set mac = 100
+		set bot_0x = $gPROF_LIMITSxmin
+		set bot_0y = $gPROF_LIMITSymax
+	
+	# Zero point in hole
+	else if ($zero_coord_x <= $zero_area_left) then
+		set out_rot = 0
+	else if ($zero_coord_x < $zero_area_right && $zero_coord_y <= $zero_area_bot) then
+		set out_rot = 90
+	else if ($zero_coord_x < $zero_area_right && $zero_coord_y >= $zero_area_top) then
+		set out_rot = 270
+	else if ($zero_coord_x >= $zero_area_right) then
+		set out_rot = 180
+	else
+		echo "WIN 100 100"						>  $gui_in
+		echo "FONT tbr24"						>> $gui_in
+		echo "LABEL Automatic SilkScreen Output $out_layer_name"	>> $gui_in
+		echo "FONT tbr18"						>> $gui_in
+		echo "RADIO rot Rotation H 1 990000"				>> $gui_in
+		echo "0"							>> $gui_in
+		echo "90"							>> $gui_in
+		echo "180"							>> $gui_in
+		echo "270"							>> $gui_in
+		echo "END"							>> $gui_in
+
+		gui $gui_in > $gui_out
+		source $gui_out ; rm $gui_in $gui_out
+
+		if ($rot == 1) then
+			set out_rot = 0
+		else if ($rot == 2) then
+			set out_rot = 90
+		else if ($rot == 3) then
+			set out_rot = 180
+		else if ($rot == 4) then
+			set out_rot = 270
+		endif
+	endif
+	
+	# Change pad size to dcode size (retrieved from out_flag) & Create Wheel table inside job to set predefined Dcodes
+	# ----------------------------------------------------------------------------------------------------------------	
+	VOF
+	COM delete_entity,job=$JOB,type=wheel,name=ss_ref_table
+	VON
+	COM create_entity,job=$JOB,is_fw=no,type=wheel,name=ss_ref_table,db=,fw_type=form
+	COM open_entity,job=$JOB,type=wheel,name=ss_ref_table,iconic=yes
+	COM wheel_current,job=$JOB,wheel=ss_ref_table
+	COM wheel_units,type=mm
+
+	if ($ss_layer == $ss_bot_list"_flat" && $mac == 100) then
+		if ($out_rot == 0) then
+			set out_rot = 180
+			set bot_0x = $gPROF_LIMITSxmin
+			set bot_0y = $gPROF_LIMITSymax
+		else	if ($out_rot == 90) then
+			set out_rot = 270
+			set bot_0x = $gPROF_LIMITSxmin
+			set bot_0y = $gPROF_LIMITSymin
+		else	if ($out_rot == 180) then
+			set out_rot = 0
+			set bot_0x = $gPROF_LIMITSxmax
+			set bot_0y = $gPROF_LIMITSymin
+		else	if ($out_rot == 270) then
+			set out_rot = 90
+			set bot_0x = $gPROF_LIMITSxmax
+			set bot_0y = $gPROF_LIMITSymax
+		endif
+	endif
+	
+	set counter = 1
+	while ($counter <= $#ss_flattened_dcode_list)	
+	   set ss_dcode = `echo $ss_flattened_dcode_list[$counter] | cut -d"," -f1`
+   	   
+	   COM filter_atr_reset
+	   COM sel_layer_feat,operation=select,layer=ref,index=$counter
+	   COM get_select_count
+
+	   if ($COMANS > 0) then
+
+	   # if the out_flag value has a "box" prefix, then no rotation is needed.
+		#======================================================================
+
+		if ($ss_flattened_dcode_list[$counter] !~ "box"*) then
+				@ ss_dcode_first_2digits = $ss_dcode / 10
+				@ ss_dcode_last_digit = $ss_dcode % 10
+	
+			switch ($ss_flattened_angle_list[$counter])
+				case 0:
+					if ($out_rot == 0) set n_sum = 0
+					if ($out_rot == 90) set n_sum = 1
+					if ($out_rot == 180) set n_sum = 2
+					if ($out_rot == 270) set n_sum = 3
+					if ($ss_flattened_dcode_list[$counter] == $ss_zero_dcode_sprint_8 || $ss_zero_dcode_sprint_100 || $ss_flattened_dcode_list[$counter] == $ss_align_dcode) breaksw
+					if ($ss_layer == $ss_bot_list"_flat") then
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum + 2) % 4
+					else
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum) % 4
+					endif
+					breaksw
+				case 90:
+					if ($out_rot == 0) set n_sum = 1
+					if ($out_rot == 90) set n_sum = 2
+					if ($out_rot == 180) set n_sum = 3
+					if ($out_rot == 270) set n_sum = 0
+					if ($ss_flattened_dcode_list[$counter] == $ss_zero_dcode_sprint_8 || $ss_zero_dcode_sprint_100 || $ss_flattened_dcode_list[$counter] == $ss_align_dcode) breaksw
+					if ($ss_layer == $ss_bot_list"_flat") then
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum + 2) % 4
+					else
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum) % 4
+					endif
+					breaksw
+				case 180:
+					if ($out_rot == 0) set n_sum = 2
+					if ($out_rot == 90) set n_sum = 3
+					if ($out_rot == 180) set n_sum = 0
+					if ($out_rot == 270) set n_sum = 1
+					if ($ss_flattened_dcode_list[$counter] == $ss_zero_dcode_sprint_8 || $ss_zero_dcode_sprint_100 || $ss_flattened_dcode_list[$counter] == $ss_align_dcode) breaksw
+					if ($ss_layer == $ss_bot_list"_flat") then
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum + 2) % 4
+					else
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum) % 4
+					endif
+					breaksw
+				case 270:
+					if ($out_rot == 0) set n_sum = 3
+					if ($out_rot == 90) set n_sum = 0
+					if ($out_rot == 180) set n_sum = 1
+					if ($out_rot == 270) set n_sum = 2
+					if ($ss_flattened_dcode_list[$counter] == $ss_zero_dcode_sprint_8 || $ss_zero_dcode_sprint_100 || $ss_flattened_dcode_list[$counter] == $ss_align_dcode) breaksw
+					if ($ss_layer == $ss_bot_list"_flat") then
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum + 2) % 4
+					else
+						@ ss_dcode_last_digit = ($ss_dcode_last_digit + $n_sum) % 4
+					endif
+					breaksw
+			endsw
+
+			set ss_dcode_rot = ${ss_dcode_first_2digits}${ss_dcode_last_digit}
+		else
+			set ss_dcode_rot = `echo $ss_flattened_dcode_list[$counter] | cut -c4-`
+		endif
+		
+		COM units,type=mm
+		COM sel_change_sym,symbol=r$ss_dcode_rot,reset_angle=no
+		COM wheel_set_dcode,dcode=$ss_dcode_rot,symbol=r$ss_dcode_rot,line=-1
+		
+	   @ counter ++
+	end
+
+	COM wheel_page_close
+	
+	# Output Silkscreen Outer and Ref Layer to the output directory
+	# -------------------------------------------------------------
+	if ($ss_layer == $ss_top_list"_flat") then
+		set out_mirror = no
+		set SIDE = TOP
+		set outer_layer = $outer_top
+	else
+		set out_mirror = yes
+		set SIDE = BOT
+		set outer_layer = $outer_bot
+
+	# Change 0 position for bot silkscreen layers (Sprint 100)
+	# -------------------------------------------------------	
+	if ($ss_layer == $ss_bot_list"_flat" && $mac == 100) then
+		COM clear_layers
+		COM display_layer,name=$out_ref_name,display=yes,number=1
+		COM work_layer,name=$out_ref_name
+		COM filter_reset,filter_name=popup
+		COM filter_atr_set,filter_name=popup,condition=yes,attribute=.out_flag,min_int_val=$ss_zero_dcode,max_int_val=$ss_zero_dcode
+		COM filter_area_strt
+		COM filter_area_end,layer=,filter_name=popup,operation=select,area_type=none,inside_area=no,intersect_area=no
+		if ($COMANS != 0) then
+			COM sel_delete
+		endif
+		COM filter_reset,filter_name=popup
+		COM cur_atr_set,attribute=.out_flag,int=$ss_zero_dcode
+		COM add_pad,attributes=yes,x=$bot_0x,y=$bot_0y,symbol=r$ss_zero_dcode,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+	endif
+		
+		if ($out_rot < 180 && $mac != 100) then
+			@ out_rot += 180
+		else if ($mac != 100) then
+			@ out_rot -= 180
+		endif
+	endif
+
+	#--------------------------------------------------------
+	#merge  drill to outer
+	if ($ss_dil_num > 0) then
+		COM clear_layers
+		COM display_layer,name=$ss_layer,display=yes,number=1
+		COM work_layer,name=$ss_layer
+		COM units,type=inch
+		COM merge_layers,source_layer=$outer_drill,dest_layer=$ss_layer,invert=yes
+	endif
+	#--------------------------------------------------------
+
+	# -------------------------------------------------------			
+	# change linewidth in print layer
+	# COM clear_layers
+	# COM display_layer,name=$ss_layer,display=yes,number=1
+	# COM work_layer,name=$ss_layer
+	# COM units,type=inch
+	#---------------------------------------------------------------------------------------------------------------------
+	# only contourize
+	# COM sel_contourize,accuracy=0.01,Break_to_islands=yes,clean_hole_size=0,clean_hole_mode=x_and_y
+	#---------------------------------------------------------------------------------------------------------------------
+	# resize and contourize
+	# COM sel_cont_resize,accuracy=0.01,Break_to_islands=no,island_size=0,hole_size=0,drill_filter=no,corner_ctl=no
+	# -------------------------------------------------------
+
+
+	COM output_layer_reset
+	COM output_layer_set,layer=$out_ref_name,angle=$out_rot,mirror=$out_mirror,x_scale=1,y_scale=1,comp=0,polarity=positive,setupfile=,setupfiletmp=,line_units=mm,gscl_file=
+	COM output,job=$JOB,step=$STEP,format=Gerber274x,dir_path=$output_dir/${JOB}-${out_dir}_$SIDE,prefix=,suffix=.gbr,break_sr=yes,break_symbols=yes,break_arc=yes,scale_mode=all,surface_mode=contour,min_brush=25.4,units=inch,coordinates=absolute,zeroes=leading,nf1=6,nf2=6,x_anchor=0,y_anchor=0,wheel=ss_ref_table,x_offset=0,y_offset=0,line_units=mm,override_online=yes,film_size_cross_scan=0,film_size_along_scan=0,ds_model=RG6500
+
+	COM output_layer_reset
+	COM output_layer_set,layer=$ss_layer,angle=$out_rot,mirror=$out_mirror,x_scale=1,y_scale=1,comp=0,polarity=positive,setupfile=,setupfiletmp=,line_units=mm,gscl_file=
+	COM output,job=$JOB,step=$STEP,format=Gerber274x,dir_path=$output_dir/${JOB}-${out_dir}_$SIDE,prefix=${JOB}-,suffix=_$SIDE.gbr,break_sr=yes,break_symbols=yes,break_arc=yes,scale_mode=all,surface_mode=contour,min_brush=25.4,units=inch,coordinates=absolute,zeroes=leading,nf1=6,nf2=6,x_anchor=0,y_anchor=0,wheel=ss_ref_table,x_offset=0,y_offset=0,line_units=mm,override_online=yes,film_size_cross_scan=0,film_size_along_scan=0,ds_model=RG6500
+
+
+
+	COM output_layer_reset
+	COM output_layer_set,layer=$outer_layer,angle=$out_rot,mirror=$out_mirror,x_scale=1,y_scale=1,comp=0,polarity=positive,setupfile=,setupfiletmp=,line_units=mm,gscl_file=
+	COM output,job=$JOB,step=$STEP,format=Gerber274x,dir_path=$output_dir/${JOB}-${out_dir}_$SIDE,prefix=,suffix=.gbr,break_sr=yes,break_symbols=yes,break_arc=yes,scale_mode=all,surface_mode=contour,min_brush=25.4,units=inch,coordinates=absolute,zeroes=leading,nf1=6,nf2=6,x_anchor=0,y_anchor=0,wheel=ss_ref_table,x_offset=0,y_offset=0,line_units=mm,override_online=yes,film_size_cross_scan=0,film_size_along_scan=0,ds_model=RG6500
+	
+    if (-e $output_dir"/"${JOB}"-"${out_dir}"_"$SIDE"/"${JOB}"-"$ss_layer"_"$SIDE".gbr") mv $output_dir"/"${JOB}"-"${out_dir}"_"$SIDE"/"${JOB}"-"$ss_layer"_"$SIDE".gbr" $output_dir"/"${JOB}"-"${out_dir}"_"$SIDE"/"${JOB}"-"${out_dir}"_"$SIDE".gbr"
+	if (-e $output_dir/${JOB}-${out_dir}_$SIDE/$outer_layer.gbr) mv $output_dir/${JOB}-${out_dir}_$SIDE/$outer_layer.gbr $output_dir/${JOB}-${out_dir}_$SIDE/layer.gbr
+
+	VOF
+	COM delete_layer,layer=$ss_layer
+	VON
+set curstep = $STEP
+end
+
+VOF
+COM delete_layer,layer=$out_ref_name
+VON
+
+#EOF 

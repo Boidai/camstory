@@ -1,0 +1,1166 @@
+#!/bin/csh
+###上述為設定此程式使用何語言###
+###設定參數路徑###
+set gui_out="/tmp/gui_out.$$"
+set gui_input="/tmp/gui_input.$$"
+set GUI_DATA="/tmp/gui_data.$$"
+set GUI_RESP="/tmp/gui_resp.$$"
+set info="/tmp/info$$"
+set info_1="/tmp/info_1$$"
+set info_drl="/tmp/info_drl$$"
+set tmp_drill="/tmp/tmp_drill$$"
+set tmp_drl_sort="/tmp/tmp_drl_sort$$"
+set tmp_drl_ans="/tmp/tmp_drl_ans$$"
+set single_1="/tmp/single_1$$"
+### 內層，Power/ground 2015/05/22 ####
+set power_1="/tmp/power_1$$"
+set mixed_1="/tmp/mixed_1$$"
+set DUL_SIG='$'
+set JJ='JOB'
+set DD='DATE'
+set LL='LAYER'
+set GBCF="$GENESIS_DIR/e$GENESIS_VER/misc/gbc -l"
+set test="/tmp/test"
+### 輸出及取得Genesis的資料 ####
+COM info,out_file=$info,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info
+\rm $info
+### 判斷資訊 ####
+set silk=0
+set smm=0
+set outsg=0
+set int=0
+###內層dount，內層有多少層變數宣告###，2015/08/06 ####	
+set inta=0
+#######
+set stupya=0
+set pina=0
+set ina=0
+foreach no($gROWrow)
+	if ($gROWcontext[$no] == 'board') then
+		if ($gROWlayer_type[$no] == 'silk_screen') then
+			set silk=`echo "$silk+1" | $GBCF`
+		endif
+		if ($gROWlayer_type[$no] == 'solder_mask' && $gROWname[$no] != 'bgac' && $gROWname[$no] != 'bgas') then
+			set smm=`echo "$smm+1" | $GBCF`
+		endif
+		if ($gROWside[$no] != 'inner' && $gROWlayer_type[$no] == 'signal') then
+			set outsg=`echo "$outsg+1" | $GBCF`
+			echo $gROWname[$no] >> $single_1
+		endif
+### 內層，Power/ground 2015/05/22 ####
+		if ($gROWside[$no] == 'inner' && $gROWlayer_type[$no] == 'power_ground') then
+			echo $gROWname[$no] >> $power_1
+		endif
+### 內層，mixed 2015/05/22 ####		
+		if ($gROWside[$no] == 'inner' && $gROWlayer_type[$no] == 'mixed') then
+			echo $gROWname[$no] >> $mixed_1
+		endif			
+
+		if ($gROWside[$no] == 'inner') then
+			set int=`echo "$int+1" | $GBCF`
+		endif
+	endif
+	if ($gROWname[$no] == 'stupy') then
+		set stupya=1
+	endif
+	if ($gROWname[$no] == 'drl') then
+		set b=`echo "$no+1" | $GBCF`
+	endif	
+	if ($gROWname[$no] == 'pin') then
+		set pina=1
+	endif
+	if ($gROWname[$no] == 'in') then
+		set ina=1
+	endif
+end
+set ch_drill="`cat $single_1`"
+### 內層，power_ground 2015/05/22 ####		
+set ch_power="`cat $power_1`"
+### 內層，mixed 2015/05/22 ####		
+set ch_mixed="`cat $mixed_1`"
+
+set LAYERS=`echo "$outsg+$int" | $GBCF`
+### 增加所需的層 ####
+if ($int != 0) then
+	if ($pina == 0) then
+		COM matrix_insert_row,job=$JOB,matrix=matrix,row=$b
+		COM matrix_add_layer,job=$JOB,matrix=matrix,layer=pin,row=$b,context=board,type=drill,polarity=positive
+	endif
+	if ($ina == 0) then
+		COM matrix_insert_row,job=$JOB,matrix=matrix,row=$b
+		COM matrix_add_layer,job=$JOB,matrix=matrix,layer=in,row=$b,context=board,type=drill,polarity=positive
+	endif
+endif
+if ($stupya == 0) then
+	COM matrix_insert_row,job=$JOB,matrix=matrix,row=1
+	COM matrix_add_layer,job=$JOB,matrix=matrix,layer=stupy,row=1,context=misc,type=document,polarity=positive
+endif
+####設定gui-one####
+gui_1:
+echo "WIN 200 200">>$gui_out
+echo "CLABEL Continue the Script">>$gui_out
+echo "FONT tbi24">>$gui_out
+echo "FG 999999">>$gui_out
+echo "LABEL Turboard Auto_panel Script 1">>$gui_out
+echo "FONT tbi14">>$gui_out
+echo "LABEL Script unit=mm">>$gui_out
+echo "BG 959590">>$gui_out
+echo "FG 000000">>$gui_out
+echo "TEXT Boxout_X Boxout_X:">>$gui_out
+echo "DTEXT Boxout_X">>$gui_out
+echo "TEXT Boxout_Y Boxout_Y:">>$gui_out
+echo "DTEXT Boxout_Y">>$gui_out
+echo "BG 800000">>$gui_out
+echo "FONT tbi18">>$gui_out
+echo "FG 999999">>$gui_out
+echo "OPTION sub_step SUB_STEP:">>$gui_out
+	foreach sb_step($gCOLstep_name)
+		if ($sb_step == 'org') then
+			set sb_step='choose_step?'
+		endif
+		echo "$sb_step">>$gui_out
+	end
+echo "END">>$gui_out
+echo "BG 959590">>$gui_out
+echo "FG 000000">>$gui_out
+echo "FONT tbi14">>$gui_out
+echo "TEXT x_gap Gap_X:">>$gui_out
+echo "DTEXT x_gap 3">>$gui_out
+echo "TEXT y_gap Gap_Y:">>$gui_out
+echo "DTEXT y_gap 3">>$gui_out
+echo "BG 800000">>$gui_out
+echo "FG 999999">>$gui_out
+echo "OPTION step_repeat S&R Rotary:">>$gui_out
+echo "Angle 0">>$gui_out
+echo "Angle 90">>$gui_out
+echo "END">>$gui_out
+echo "BG 959590">>$gui_out
+echo "FG 000000">>$gui_out
+echo "FONT tbi14">>$gui_out
+echo "RADIO choise_1 Game_over : V 992222">>$gui_out
+echo "No">>$gui_out
+echo "Yes">>$gui_out
+echo "END">>$gui_out
+echo "LABEL Copyright By Soyang 08.28.2006">>$gui_out
+echo "END">>$gui_out
+####取得gui資料###
+gui $gui_out > $gui_input
+source $gui_input
+\rm $gui_out
+\rm $gui_input
+#### 後悔時刻####
+if ($choise_1 == 2) then
+	goto END
+endif
+###建立wpnl並自動排版###
+set Sub_pnl=$gCOLstep_name[$sub_step]
+set ch_step=0
+foreach check($gCOLstep_name)
+	if ($check == 'wpnl') then
+		set ch_step=1
+	endif
+end
+if ($ch_step == 1) then
+	COM delete_entity,job=$JOB,type=step,name=wpnl
+endif
+if ($step_repeat == 1) then
+	set Rotary='Horizontal'
+	else
+	set Rotary='Vertical'
+endif
+COM create_entity,job=$JOB,is_fw=no,type=step,name=wpnl,db=,fw_type=form
+COM open_entity,job=$JOB,type=step,name=wpnl,iconic=no
+COM units,type=mm
+COM sr_auto,step=$Sub_pnl,num_mode=multiple,xmin=0,ymin=0,width=$Boxout_X,height=$Boxout_Y,panel_margin=0,step_margin=$x_gap,gold_plate=no,gold_side=right,orientation=$Rotary,evaluate=no,active_margins=yes,top_active=0,bottom_active=0,left_active=0,right_active=0,step_margin_y=$y_gap
+COM set_attribute,type=step,job=$JOB,name1=wpnl,name2=,name3=,attribute=.pnl_class,value=,units=inch
+COM set_attribute,type=step,job=$JOB,name1=wpnl,name2=,name3=,attribute=.pnl_pcb,value=$Sub_pnl,units=inch
+###取得排版參數###
+set pnl_part="/tmp/pnl_part$$"
+COM info,out_file=$pnl_part,write_mode=replace,units=mm,args=-t step -e $JOB/wpnl -d SR
+source $pnl_part
+\rm $pnl_part
+###判斷發料尺寸###
+set short='short_xy'
+set warn_gui_language='no'
+set pi=0
+if (`echo "$int > 2" | $GBCF`) then
+	if (`echo "$gSRymin < 9.4" | $GBCF` | `echo "$gSRxmin < 9.4" | $GBCF`) then
+		set pi=1
+	endif
+endif
+if (`echo "$gSRxmin < 7.2 && $gSRymin < 7.2" | $GBCF` | $pi == 1) then
+	set warn1="/tmp/warn1"
+	set warn_input1="/tmp/warn_input1"
+	echo "WIN 200 200">>$warn1
+	echo "FONT tbi24">>$warn1
+	echo "BG 999999">>$warn1
+	echo "FG 990000">>$warn1
+	echo "LABEL Warning">>$warn1
+	echo "LABEL Working_Size Too Small">>$warn1
+	if ($pi == 1) then
+		echo "LABEL 6_layers X=$gSRxmin too small">>$warn1
+	endif
+	echo "LABEL Why do you do">>$warn1
+	echo "RADIO why_do ' ' : V 992222">>$warn1
+	echo "Return">>$warn1
+	echo "Continue">>$warn1
+	echo "END">>$warn1
+	echo "END">>$warn1
+	gui $warn1 > $warn_input1
+	source $warn_input1
+	\rm $warn_input1
+	\rm $warn1
+	if ($why_do == 1) then
+		\rm $single_1
+### 刪除 power_1$$ & mixed_1$$ 暫存檔2015/05/22 ####		
+		\rm $power_1
+		\rm $mixed_1
+		goto gui_1
+	endif
+	if ($why_do == 2) then
+		set warn_gui_language='yes'	
+	endif
+endif
+if (`echo "$gSRxmin < 7.2" | $GBCF`) then
+	set short='short_x'
+endif
+if (`echo "$gSRymin < 7.2" | $GBCF`) then
+	set short='short_y'
+endif
+###gui-two####
+echo "WIN 220 220">>$GUI_DATA
+echo "CLABEL Continue the Script">>$GUI_DATA
+echo "FONT tbi18">>$GUI_DATA
+echo "LABEL Turboard Auto_Panel Script 2">>$GUI_DATA
+echo "FONT tb114">>$GUI_DATA
+echo "LABEL PCBBOX-Scripts    unit=MM " >> $GUI_DATA
+echo "FONT tbr14" >> $GUI_DATA
+echo "TEXT pcb_name Jobs Name                    :">>$GUI_DATA
+echo "DTEXT pcb_name $JOB">>$GUI_DATA
+###外層###
+echo "FG 999900">>$GUI_DATA
+echo "FONT cbi18">>$GUI_DATA
+echo "LABEL Out_Side Part">>$GUI_DATA
+echo "FONT cbi14" >> $GUI_DATA
+echo "TEXT DATE2 Thinkness       : " >> $GUI_DATA
+echo "DTEXT DATE2 1.6T 1/1" >> $GUI_DATA
+echo "TEXT DATE5 Line/Sapce      : " >> $GUI_DATA
+echo "DTEXT DATE5 " >> $GUI_DATA
+echo "TEXT DATE6 Compenson       : " >> $GUI_DATA
+echo "DTEXT DATE6 mils" >> $GUI_DATA
+###內層###
+if ($LAYERS>2) then
+	echo "FG 999999">>$GUI_DATA
+	echo "FONT tbi18">>$GUI_DATA
+	echo "LABEL Inner_Side Part">>$GUI_DATA
+	echo "FONT tbi14">>$GUI_DATA
+	echo "TEXT DATE11 Inner_Thinkness              : " >> $GUI_DATA
+	echo "DTEXT DATE11 1.0T 1/1" >> $GUI_DATA
+	echo "TEXT DATE12 Inner_Compenson            : " >> $GUI_DATA
+	echo "DTEXT DATE12 mils " >> $GUI_DATA
+	echo "TEXT DATE13 Scale                                      : " >> $GUI_DATA
+	echo "DTEXT DATE13 " >> $GUI_DATA
+endif
+###選項###
+echo "FG 000000">>$GUI_DATA
+echo "FONT tmi12">>$GUI_DATA
+echo "RADIO mask_bga Mask____Bga : V 992222">>$GUI_DATA
+echo "NO">>$GUI_DATA
+echo "60%">>$GUI_DATA
+echo "100%">>$GUI_DATA
+echo "END">>$GUI_DATA
+### 綠漆顏色改成下拉式選單 2015/05/22 ####	
+echo "OPTION mask_color Mask___Color :">>$GUI_DATA
+#echo "RADIO mask_color Mask___Color : V 992222">>$GUI_DATA
+echo "GREEN">>$GUI_DATA
+echo "BLACK">>$GUI_DATA
+echo "YELLOW">>$GUI_DATA
+echo "RED">>$GUI_DATA
+echo "BLUE">>$GUI_DATA
+echo "WHITE">>$GUI_DATA
+echo "M-BLACK">>$GUI_DATA
+echo "M-RED">>$GUI_DATA
+echo "PURPLE">>$GUI_DATA
+echo "M-GREEN">>$GUI_DATA
+echo "END">>$GUI_DATA
+if ($silk != 0) then
+### 文字顏色改成下拉式選單 2015/05/22 ####
+    echo "OPTION screen_color Screen__Color :">>$GUI_DATA
+	#echo "RADIO screen_color Screen__Color : V 992222">>$GUI_DATA
+	echo "WHITE">>$GUI_DATA
+	echo "BLACK">>$GUI_DATA
+	echo "YELLOW">>$GUI_DATA
+	echo "END">>$GUI_DATA
+else
+	set screen_color=1
+endif
+echo "RADIO date_order Date____Order : V 992222">>$GUI_DATA
+echo "ddyy........">>$GUI_DATA
+echo "yydd">>$GUI_DATA
+echo "END">>$GUI_DATA
+echo "RADIO tenting Tenting______ : V 992222">>$GUI_DATA
+echo "NO...........">>$GUI_DATA
+echo "YES">>$GUI_DATA
+echo "END">>$GUI_DATA
+echo "RADIO choise  Game____Over : V 992222">>$GUI_DATA
+echo "NO...........">>$GUI_DATA
+echo "YES">>$GUI_DATA
+echo "END">>$GUI_DATA
+echo "LABEL Copyright By Soyang 08.28.2006">>$GUI_DATA
+echo "END" >> $GUI_DATA
+####取得gui輸入之數值###
+gui $GUI_DATA > $GUI_RESP
+source $GUI_RESP
+\rm $GUI_RESP 
+\rm $GUI_DATA
+### 輸出及取得Genesis的資料 ####
+COM info,out_file=$info_1,write_mode=replace,units=mm,args=-t matrix -e $JOB/matrix
+source $info_1
+\rm $info_1
+### 設定GUI對應參數 ####
+#### 後悔時刻####
+if ($choise == 2) then
+	COM delete_entity,job=$JOB,type=step,name=wpnl
+	\rm $info
+	\rm $single_1
+### 刪除 power_1$$ & mixed_1$$ 暫存檔2015/05/22 ####		
+	\rm $power_1
+	\rm $mixed_1	
+	goto END
+endif
+###設定gui對應的symbols#####
+if ($mask_bga == 2) then
+	set maskbga='14sy'
+	else if ($mask_bga == 3) then
+		set maskbga='10sy'
+	endif
+endif
+if ($mask_color == 2) then
+		set maskcolor='04sy'
+	else if ($mask_color == 3) then
+		set maskcolor='06sy'
+	else if ($mask_color == 4) then
+		set maskcolor='05sy'
+	else if ($mask_color == 5) then
+		set maskcolor='07sy'
+            else if ($mask_color == 6) then
+		set maskcolor='03sy'
+            else if ($mask_color == 7) then
+		set maskcolor='04-1sy'
+            else if ($mask_color == 8) then
+		set maskcolor='05-1sy'
+            else if ($mask_color == 9) then
+		set maskcolor='15sy'
+            else if ($mask_color == 10) then
+		set maskcolor='16sy'
+	endif
+endif
+if ($screen_color == 1) then
+		set screencolor='03sy'
+	else if ($screen_color == 2) then
+		set screencolor='04sy'
+	else if ($screen_color == 3) then
+		set screencolor='06sy'
+	endif
+endif
+if ($date_order == 1 ) then
+	set dateorder='12sy'
+else
+	set dateorder='11sy'
+endif
+### 鑽孔尺寸檢查及排序 ####
+foreach SETP_NO($gCOLcol)
+	if ($gCOLtype[$SETP_NO] == 'step' && $gCOLstep_name[$SETP_NO] != 'org' && $gCOLstep_name[$SETP_NO] != 'wpnl') then
+		COM info,out_file=$info_drl,write_mode=replace,units=inch,args=-t layer -e $JOB/$gCOLstep_name[$SETP_NO]/drl
+		source $info_drl
+		foreach drl($gTOOLdrill_size)
+			echo $drl >> $tmp_drill
+		end
+	endif
+end
+sort -n $tmp_drill > $tmp_drl_sort
+###移除孔徑6.5mm以上###
+set drl_1=254
+set big_drl=0
+set tmp_d1=0
+set de_small=25.6
+foreach cfm("`cat $tmp_drl_sort`")
+	if ($cfm != $tmp_d1) then
+		if (`echo "$cfm < $drl_1" | $GBCF`) then
+			echo $cfm >> $tmp_drl_ans
+			set big_drl=`echo "$cfm*25.4/1000" | $GBCF`
+			set tmp_d1=$cfm
+		endif
+		if (`echo "$cfm <= $de_small" | $GBCF`) then
+			set small_drill=$cfm
+		else
+			set small_drill=$de_small
+		endif
+	endif
+end
+set DISCERN_DRL="`cat $tmp_drl_ans`"
+###基準點###
+###座標XY###
+set basic_x1=`echo "$gSRxmin/2" | $GBCF`
+set basic_x2=`echo "$Boxout_X-$basic_x1" | $GBCF`
+set basic_y1=`echo "$gSRymin/2" | $GBCF`
+set basic_y2=`echo "$Boxout_Y-$basic_y1" | $GBCF`
+if ($short == 'short_x') then
+	set pin_x1=`echo "$gSRxmin" | $GBCF`
+	set pin_y1=`echo "$basic_y1+9" | $GBCF`
+endif
+if ($short == 'short_y') then
+	set pin_x1=`echo "$basic_x1+9" | $GBCF`
+	set pin_y1=`echo "$gSRymin" | $GBCF`
+endif
+if ($short == 'short_xy') then
+	set pin_x1=`echo "$basic_x1+9" | $GBCF`
+	set pin_y1=`echo "$basic_y1+9" | $GBCF`
+endif
+set pin_x2=`echo "$pin_x1+5" | $GBCF`
+set pin_x3=`echo "$pin_x2+5" | $GBCF`
+set pin_x4=`echo "$pin_x3+5" | $GBCF`
+set pin_x6=`echo "$Boxout_X-$pin_x1" | $GBCF`
+set pin_x5=`echo "$pin_x6-5" | $GBCF`
+set pin_x7=`echo "$Boxout_X/2" | $GBCF`
+set pin_x10=`echo "$pin_x4+7" | $GBCF`
+set pin_x11=`echo "$Boxout_X-30" | $GBCF`
+set pin_x8=`echo "$pin_x10+($pin_x11-$pin_x10)/4" | $GBCF`
+set pin_x9=`echo "$pin_x11-($pin_x11-$pin_x10)/4" | $GBCF`
+set pin_y2=`echo "$pin_y1+5" | $GBCF`
+set pin_y3=`echo "$pin_y2+5" | $GBCF`
+set pin_y4=`echo "$pin_y3+5" | $GBCF`
+set pin_y6=`echo "$Boxout_Y-$pin_y1" | $GBCF`
+set pin_y5=`echo "$pin_y6-5" | $GBCF`
+set pin_y7=`echo "$Boxout_Y/2" | $GBCF`
+set pin_y8=`echo "$pin_y7-130" | $GBCF`
+set pin_y9=`echo "$pin_y8+255" | $GBCF`
+set pin_y10=`echo "$pin_y7+5" | $GBCF`
+###組合孔加八顆座標###，2015/08/12 ####	
+set pin_y11=`echo "$pin_y10+10" | $GBCF`
+set pin_y12=`echo "$pin_y10-10" | $GBCF`
+set pin_y13=`echo "$basic_y2-25" | $GBCF`
+set pin_y15=`echo "$pin_y4-24" | $GBCF`
+###組合孔左下角右移43mm座標###，2015/08/12 ####	
+set basic_x3=`echo "$basic_x1+43" | $GBCF`
+
+###內層dount座標XY###，2015/08/06 ####	
+set dount_x8=`echo "$pin_x8-10" | $GBCF`
+set dount_x9=`echo "$pin_x9+10" | $GBCF`
+
+
+###設定文字防焊參數###
+if ($silk == 0) then
+	set sd = '01sy'
+endif
+if ($silk == 1) then
+	set sd = '02sy'
+endif
+if ($silk == 2) then
+	set sd = '13sy'
+endif
+if ($smm == 0) then
+	set sdsm = '01sy'
+endif
+if ($smm == 1) then
+	set sdsm = '02sy'
+endif
+if ($smm == 2) then
+	set sdsm = '13sy'
+endif
+###電鍍框###
+set pho_a2=2
+set warn4=0
+set in_n=0
+set ch_invert='yes'
+set ch1_invert='no'
+set AA='nx=5,ny=1,dx=0.3048,dy=0'
+if ($short == 'short_x') then
+	set AA='nx=1,ny=5,dx=0,dy=0.3048'
+endif
+###各層別###
+foreach no($gROWrow)
+	if ($gROWcontext[$no] == 'board' | $gROWname[$no] == 'li' | $gROWname[$no] == 'stupy') then
+		COM display_layer,name=$gROWname[$no],display=yes,number=1
+		COM work_layer,name=$gROWname[$no]
+		###判斷及設定字正反###
+		if ($gROWside[$no] == 'inner') then
+			if ($in_n == 0 | $in_n == 1) then
+				set w601='w60'
+				set in_n=2
+			else
+				set w601='w61'
+				set in_n=1
+			endif
+		else
+			set w601=0
+		endif
+		###文字基本位置###
+		set JL_name_y=`echo "$Boxout_Y-$gSRymin/2-2" | $GBCF`
+		set bga_text_y1=`echo "$Boxout_Y-$gSRymin+3.5" | $GBCF`
+		set SL_text_y2=`echo "$Boxout_Y-$gSRymin+3.5" | $GBCF`
+		set SL_text_y3=`echo "$SL_text_y2+3.9" | $GBCF`
+		set CP_text_x10=`echo "$Boxout_X-$gSRxmin+4.75" | $GBCF`
+		set CP_text_x11=`echo "$Boxout_X-$gSRxmin+5.5" | $GBCF`
+		set DR_text_x5=`echo "$CP_text_x11+3.7" | $GBCF`
+		set CP_text_x9=`echo "$CP_text_x11+2.6" | $GBCF`
+		set CP_text_x6=`echo "$CP_text_x9+0.65" | $GBCF`
+		set CP_text_x7=`echo "$CP_text_x11+2" | $GBCF`
+		set CP_text_x8=`echo "$CP_text_x11+2" | $GBCF`
+		###字正###
+		if ($gROWlayer_type[$no] == 'drill' | $gROWname[$no] == 'li' | $gROWname[$no] == 'stupy' | $gROWside[$no] == 'top' | $w601 == 'w60') then
+			set define_mirror='no'
+			set betang=270
+			###設定字正文字座標###
+			set JL_name_x=`echo "$Boxout_X-77" | $GBCF`
+			set SL_text_x2=`echo "$pin_x4+($Boxout_X-$pin_x4-23)/4+11" | $GBCF`
+			set SL_text_x3=`echo "$SL_text_x2+9.8" | $GBCF`
+			set SL_text_x4=`echo "$SL_text_x3+9.8" | $GBCF`
+				### 單雙面板文字及防焊位置改變 ####
+			if ($int == 0) then
+				set SL_text_x2=`echo "$pin_x10+10" | $GBCF`
+				set SL_text_x3=`echo "$SL_text_x2+9.8" | $GBCF`
+				set SL_text_x4=`echo "$SL_text_x3+9.8" | $GBCF`
+			endif
+			set bga_text_x1=`echo "$pin_x2+2.5" | $GBCF`
+			set CP_text_y10=`echo "$pin_y8+29.5" | $GBCF`
+			set CP_text_y11=`echo "$pin_y8+10" | $GBCF`
+			set DR_text_y5=`echo "$pin_y8+10" | $GBCF`
+			set CP_text_y9=`echo "$pin_y8+41" | $GBCF`
+			set CP_text_y6=`echo "$CP_text_y9+4.7" | $GBCF`
+			set CP_text_y7=`echo "$CP_text_y9-8.5" | $GBCF`
+			set CP_text_y8=`echo "$CP_text_y7+12.7" | $GBCF`
+		endif
+		###字反###
+		if ($gROWside[$no] == 'bottom' | $w601 == 'w61') then
+			set define_mirror='yes'
+			set betang=90
+			###設定字反文字座標###
+			set bga_text_x1=`echo "$pin_x2+10" | $GBCF`
+			set SL_text_x2=`echo "$pin_x4+($Boxout_X-$pin_x4-23)/4+41" | $GBCF`
+			set SL_text_x3=`echo "$SL_text_x2-9.8" | $GBCF`
+			set SL_text_x4=`echo "$SL_text_x3-9.8" | $GBCF`
+			set JL_name_x=`echo "$Boxout_X-35" | $GBCF`
+				### 單雙面板文字及防焊位置改變 ####
+			if ($int == 0) then
+				set SL_text_x2=`echo "$pin_x10+39" | $GBCF`
+				set SL_text_x3=`echo "$SL_text_x2-9.8" | $GBCF`
+				set SL_text_x4=`echo "$SL_text_x3-9.8" | $GBCF`
+			endif
+			set CP_text_y10=`echo "$pin_y9-29.5" | $GBCF`
+			set CP_text_y11=`echo "$pin_y9-10" | $GBCF`
+			set DR_text_y5=`echo "$pin_y9-10" | $GBCF`
+			set CP_text_y9=`echo "$pin_y9-41" | $GBCF`
+			set CP_text_y6=`echo "$CP_text_y9-4.7" | $GBCF`
+			set CP_text_y7=`echo "$CP_text_y9+8.5" | $GBCF`
+			set CP_text_y8=`echo "$CP_text_y7-12.7" | $GBCF`
+		endif			
+		###判斷及設定正負性###
+		if ($gROWname[$no] == 'li' | $gROWname[$no] == 'stupy' | $gROWlayer_type[$no] == 'drill' | $gROWlayer_type[$no] == 'silk_screen') then
+			set define_polarity='positive'
+		else
+			set define_polarity='negative'
+		endif
+		###設定各層Symbol形狀###
+		###鑽孔層###
+		if ($gROWlayer_type[$no] == 'drill' | $gROWname[$no] == 'li' | $gROWname[$no] == 'stupy') then
+		### 改六角形 tg_3a  ### 2015/09/02 ####
+			set tg_4='r3175';set tg_3='r3175';set tg_3a='r3175';set pk1='r3175';set pk='r3175'
+			set symbol_x1='r3175';set symbol_x2='r3175';set symbol_x3='r3175';set symbol_x4='r3175';set symbol_x5='r3175';set symbol_x6='r3175';set symbol_x7='r3175';set symbol_x8='r3175';set symbol_x9='r3175';set symbol_x10='r3175'
+			#2015/6/23內外層長邊鑽孔尺寸變小供DI使用
+			if ($gROWname[$no] == 'in') then
+				set symbol_y1='r3175';set symbol_y2='r995.68';set symbol_y3='r3175';set symbol_y4='r3175';set symbol_y5='r995.68';set symbol_y6='r3175';set symbol_y7='r3175';set symbol_y8='r995.68';set symbol_y9='r995.68';set symbol_y10='r3175'
+			else
+				set symbol_y1='r995.68';set symbol_y2='r3175';set symbol_y3='r3175';set symbol_y4='r3175';set symbol_y5='r3175';set symbol_y6='r995.68';set symbol_y7='r995.68';set symbol_y8='r3175';set symbol_y9='r3175';set symbol_y10='r995.68'
+			endif
+
+			
+		endif
+		if ($gROWcontext[$no] == 'board' && $gROWlayer_type[$no] != 'drill' && $gROWlayer_type[$no] != 'silk_screen') then
+			###字正層###
+			if ($gROWside[$no] == 'top' | $w601 == 'w60') then
+		### 改六角形 tg_3a  ### 2015/09/02 ####			
+				set tg_4='tg-4';set tg_3='tg_3';set tg_3a='tg_3a';set pk1='pk1';set pk='pk3'			
+				set symbol_x1='5k-pin';set symbol_x2='hand_pin';set symbol_x3='hand_pin';set symbol_x4='hand';set symbol_x5='5k-pin';set symbol_x6='hand_pin';set symbol_x7='hand_pin';set symbol_x8='5k-pin';set symbol_x9='5k-pin';set symbol_x10='hand_pin'
+				set symbol_y1='hand_pin';set symbol_y2='pin';set symbol_y3='pin';set symbol_y4='pin';set symbol_y5='pin';set symbol_y6='hand_pin';set symbol_y7='hand_pin';set symbol_y8='pin';set symbol_y9='pin';set symbol_y10='hand_pin'
+			endif
+			###字反層###
+			if ($gROWside[$no] == 'bottom' | $w601 == 'w61' && $gROWlayer_type[$no] != 'drill') then
+		### 改六角形 tg_3a  ### 2015/09/02 ####			
+				set tg_4='tg-4';set tg_3='tg_3';set tg_3a='tg_3a';set pk1='pk1';set pk='pk2'			
+				set symbol_x1='5k-pin';set symbol_x2='hand_pin';set symbol_x3='hand';set symbol_x4='hand_pin';set symbol_x5='5k-pin';set symbol_x6='hand';set symbol_x7='hand';set symbol_x8='5k-pin';set symbol_x9='5k-pin';set symbol_x10='hand'
+				set symbol_y1='pin';set symbol_y2='pin';set symbol_y3='pin';set symbol_y4='hand_pin';set symbol_y5='hand_pin';set symbol_y6='pin';set symbol_y7='pin';set symbol_y8='hand_pin';set symbol_y9='hand_pin';set symbol_y10='pin'
+			endif
+		endif
+		###文字層###
+		if ($gROWlayer_type[$no] == 'silk_screen') then
+			set symbol_x1='silk-pin';set symbol_x2='silk-pin';set symbol_x3='silk-pin';set symbol_x4='silk-pin';set symbol_x5='silk-pin';set symbol_x6='silk-pin';set symbol_x7='silk-pin';set symbol_x8='silk-pin';set symbol_x9='silk-pin';set symbol_x10='silk-pin'
+			set symbol_y1='silk-pin';set symbol_y2='silk-pin';set symbol_y3='silk-pin';set symbol_y4='silk-pin';set symbol_y5='silk-pin';set symbol_y6='silk-pin';set symbol_y7='silk-pin';set symbol_y8='silk-pin';set symbol_y9='silk-pin';set symbol_y10='silk-pin'
+		endif
+		###電鍍框###
+		if ($gROWlayer_type[$no] != 'drill' && $gROWcontext[$no] == 'board' && $gROWlayer_type[$no] != 'silk_screen') then
+			if ($gROWside[$no] == 'inner') then
+				set margin2=0
+			else
+				set margin2=3
+			endif
+			set margin1=2
+			set polarity_1='positive'
+			if ($gROWside[$no] != 'inner' && $gROWlayer_type[$no] != 'solder_mask') then
+				if ($outsg == 1 | $tenting == 2) then
+					set margin1=1
+					set margin2=0
+					set polarity_1='negative'
+				endif
+			endif
+			###電鍍黑框###
+			COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=,dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+			COM sr_fill,polarity=$polarity_1,step_margin=-3,step_max_dist=2540,sr_margin=$margin2,nest_sr=no,consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no
+			if ($margin1 == 1) then
+				COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=,dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+				COM sr_fill,polarity=positive,step_margin=3,step_max_dist=2540,sr_margin=3,nest_sr=no,consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no
+			endif
+			###內層阻膠豆###			
+			if ($int > 0 && $gROWside[$no] == 'inner') then
+				COM fill_params,type=pattern,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=$w601,dx=3.048,dy=3.048,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+				COM sr_fill,polarity=negative,step_margin=1.5,step_max_dist=300,sr_margin=3,nest_sr=no,consider_feat=no,feat_margin=0,consider_drill=no,drill_margin=0,dest=affected_layers,attributes=no
+				COM fill_params,type=solid,origin_type=datum,solid_type=surface,min_brush=25.4,use_arcs=yes,symbol=,dx=2.54,dy=2.54,break_partial=yes,cut_prims=no,outline_draw=no,outline_width=0,outline_invert=no
+			endif
+			## 文字底部區塊 ####
+			COM add_pad,attributes=no,x=`echo "$Boxout_X-56" | $GBCF`,y=`echo "$Boxout_Y-$gSRymin/2-0.4" | $GBCF`,symbol=rect44000x5000,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		endif
+		###增加工具孔###
+		if ($gROWname[$no] != 'stupy' && $gROWname[$no] != '2nd') then
+			if ($gROWname[$no] != 'pin') then
+				if ($short == 'short_y' | $short == 'short_xy' | $warn_gui_language == 'yes') then				
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y1,symbol=$symbol_y1,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y2,symbol=$symbol_y2,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y3,symbol=$symbol_y3,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y4,symbol=$symbol_y4,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y5,symbol=$symbol_y5,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x1,y=$pin_y6,symbol=$symbol_y6,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x2,y=$pin_y1,symbol=$symbol_y7,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x2,y=$pin_y2,symbol=$symbol_y8,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x2,y=$pin_y5,symbol=$symbol_y9,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$basic_x2,y=$pin_y6,symbol=$symbol_y10,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				endif
+				if ($short == 'short_x' | $short == 'short_xy' | $warn_gui_language == 'yes') then
+					COM add_pad,attributes=no,x=$pin_x1,y=$basic_y1,symbol=$symbol_x1,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x2,y=$basic_y1,symbol=$symbol_x2,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x3,y=$basic_y1,symbol=$symbol_x3,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x4,y=$basic_y1,symbol=$symbol_x4,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x5,y=$basic_y1,symbol=$symbol_x5,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x6,y=$basic_y1,symbol=$symbol_x6,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x1,y=$basic_y2,symbol=$symbol_x7,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x2,y=$basic_y2,symbol=$symbol_x8,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x5,y=$basic_y2,symbol=$symbol_x9,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$pin_x6,y=$basic_y2,symbol=$symbol_x10,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				endif
+			endif
+			###內層工具孔####
+			if ($int != 0 && $gROWcontext[$no] == 'board') then
+				###靶孔取消 2015/05/22 #######
+				if ($int > 0) then
+					if ($gROWname[$no] == 'pin' | $gROWside[$no] == 'inner') then
+						COM add_pad,attributes=no,x=$pin_x8,y=$basic_y1,symbol=$tg_4,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$pin_x8,y=$basic_y2,symbol=$tg_4,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$pin_x9,y=$basic_y1,symbol=$tg_4,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+### 六層板以上才加內層dount 2015/08/06 ####
+if ($int >= 4) then
+		if ($gROWside[$no] == 'inner') then
+			set inta=`echo "$inta+1" | $GBCF`
+#			set intb = "int"$inta
+						COM add_pad,attributes=no,x=$dount_x8,y=$basic_y1,symbol=$inta,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$dount_x8,y=$basic_y2,symbol=$inta,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$dount_x9,y=$basic_y1,symbol=$inta,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+		endif
+endif
+					endif
+				endif
+				###組合孔###
+				if ($int > 2) then
+					if ($gROWname[$no] == 'in' | $gROWside[$no] == 'inner') then
+###組合孔左下角右移43 改六角形 tg_3a ### 2015/09/02 ###					
+						COM add_pad,attributes=no,x=$basic_x3,y=$basic_y1,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+####
+						COM add_pad,attributes=no,x=$basic_x1,y=$basic_y1,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x1,y=$pin_y10,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x1,y=$basic_y2,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y4,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y10,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$basic_y2,symbol=$tg_3,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+###組合孔加八顆改六角形 tg_3a  ### 2015/09/02 ###
+						COM add_pad,attributes=no,x=$basic_x1,y=$pin_y11,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y11,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x1,y=$pin_y12,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y12,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+						COM add_pad,attributes=no,x=$basic_x1,y=$pin_y13,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y13,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y15,symbol=$tg_3a,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+					endif
+				endif
+			endif
+			### 平行曝光機pin孔###
+			if (`echo "$Boxout_Y-$gSRymin > 305 && $Boxout_X > 160" | $GBCF` && $short == 'short_xy' && $gROWcontext[$no] == 'board') then
+				if ($gROWname[$no] != 'pin') then 
+					if ($gROWlayer_type[$no] == 'signal' | $gROWside[$no] == 'inner' | $gROWlayer_type[$no] == 'drill' | $gROWlayer_type[$no] == 'solder_mask') then
+						COM add_pad,attributes=no,x=$pin_x10,y=$basic_y1,symbol=$pk,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$pin_x11,y=$basic_y1,symbol=$pk,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$pin_x10,y=$basic_y2,symbol=$pk,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$pin_x11,y=$basic_y2,symbol=$pk,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y8,symbol=$pk1,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$basic_x2,y=$pin_y9,symbol=$pk1,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					endif
+				endif
+			endif
+		endif	
+		###增加文字說明###
+		if ($gROWlayer_type[$no] != 'drill' && $gROWname[$no] != 'stupy') then
+			###料號層名###
+			if ($gROWname[$no] == 'li') then
+				set JL_name_x=`echo "$Boxout_X-77" | $GBCF`
+				set JL_name_y=`echo "$Boxout_Y-$gSRymin/2-2" | $GBCF`
+			endif
+			COM add_text,attributes=no,type=string,x=$JL_name_x,y=$JL_name_y,text=$DUL_SIG$DUL_SIG$JJ $DUL_SIG$DUL_SIG$LL,x_size=3.3,y_size=3.3,w_factor=1.25,polarity=$define_polarity,angle=0,mirror=$define_mirror,fontname=standard
+### 加層別識別文字 2015/05/22 ####
+		    if ($gROWcontext[$no] == 'board' && $gROWside[$no] == 'top') then
+				set JL_name_x=`echo "$Boxout_X-60" | $GBCF`
+				set JL_name_y=`echo "$Boxout_Y-$gSRymin/2+4.5" | $GBCF`
+		      if ($gROWlayer_type[$no] == 'silk_screen') then				
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=1s,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif
+		      if ($gROWlayer_type[$no] == 'solder_mask') then				
+			  COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=rect18700x5000,polarity=positive,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=m1,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif
+		      if ($gROWlayer_type[$no] == 'signal' && $gROWside[$no] == 'top') then				
+			  COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=rect18700x5000,polarity=positive,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=top,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif  
+			endif
+		    if ($gROWcontext[$no] == 'board' && $gROWside[$no] == 'bottom') then
+				set JL_name_x=`echo "$Boxout_X-60" | $GBCF`
+				set JL_name_y=`echo "$Boxout_Y-$gSRymin/2+4.5" | $GBCF`
+		      if ($gROWlayer_type[$no] == 'silk_screen') then				
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=2s,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif
+		      if ($gROWlayer_type[$no] == 'solder_mask') then				
+			  COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=rect18700x5000,polarity=positive,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=m2,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif
+		      if ($gROWlayer_type[$no] == 'signal' && $gROWside[$no] == 'bottom') then				
+			  COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=rect18700x5000,polarity=positive,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+              COM add_pad,attributes=no,x=$JL_name_x,y=$JL_name_y,symbol=bot,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			  endif  
+			endif
+			if ($gROWcontext[$no] == 'board') then
+				###塞孔與否###
+				if ($mask_bga != 1 && $gROWside[$no] != 'inner' && $gROWlayer_type[$no] != 'silk_screen') then
+					COM add_pad,attributes=no,x=$bga_text_x1,y=$bga_text_y1,symbol=$maskbga,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				endif
+				###防焊文字顏色等###
+				if ($gROWside[$no] != 'inner') then
+					COM add_pad,attributes=no,x=$SL_text_x2,y=$SL_text_y2,symbol=$sdsm,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$SL_text_x3,y=$SL_text_y2,symbol=09sy,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					if ($mask_color != 1) then
+						COM add_pad,attributes=no,x=$SL_text_x4,y=$SL_text_y2,symbol=$maskcolor,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					endif
+					COM add_pad,attributes=no,x=$SL_text_x2,y=$SL_text_y3,symbol=$sd,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_pad,attributes=no,x=$SL_text_x3,y=$SL_text_y3,symbol=08sy,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					if ($silk != 0) then
+						COM add_pad,attributes=no,x=$SL_text_x4,y=$SL_text_y3,symbol=$screencolor,polarity=$define_polarity,angle=0,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					endif
+				endif
+				###週期,蝕刻補償等等需修改位置時,設定下列參數###
+				if ($short == 'short_x') then
+					set betang=0
+					###基本###
+					set CP_text_y10=`echo "$gSRymin-4.75" | $GBCF`
+					set CP_text_y11=`echo "$CP_text_y10-0.75" | $GBCF`
+					set DR_text_y5=`echo "$CP_text_y11-3.7" | $GBCF`
+					set CP_text_y9=`echo "$CP_text_y11-2.3" | $GBCF`
+					set CP_text_y6=`echo "$CP_text_y9-0.65" | $GBCF`
+					set CP_text_y7=`echo "$CP_text_y11-3" | $GBCF`
+					set CP_text_y8=$CP_text_y7
+					###字正###
+					if ($define_mirror == 'no') then
+						set CP_text_x10=`echo "$pin_x5-50" | $GBCF`
+						set CP_text_x11=`echo "$CP_text_x10-19.5" | $GBCF`
+						set DR_text_x5=`echo "$CP_text_x11" | $GBCF`
+						set CP_text_x9=`echo "$CP_text_x11+31" | $GBCF`
+						set CP_text_x6=`echo "$CP_text_x9+4.7" | $GBCF`
+						set CP_text_x7=`echo "$CP_text_x9-8.5" | $GBCF`
+						set CP_text_x8=`echo "$CP_text_x7+12.7" | $GBCF`
+					endif
+					###字反###
+					if ($define_mirror == 'yes') then
+						set CP_text_x10=`echo "$pin_x5-45" | $GBCF`
+						set CP_text_x11=`echo "$CP_text_x10+19.5" | $GBCF`
+						set DR_text_x5=`echo "$CP_text_x11" | $GBCF`
+						set CP_text_x9=`echo "$CP_text_x11-31" | $GBCF`
+						set CP_text_x6=`echo "$CP_text_x9-4.7" | $GBCF`
+						set CP_text_x7=`echo "$CP_text_x9+8.5" | $GBCF`
+						set CP_text_x8=`echo "$CP_text_x7-12.7" | $GBCF`
+					endif
+				endif
+				###週期順序###
+				if ($gROWlayer_type[$no] != 'solder_mask' && $gROWside[$no] != 'inner') then
+					COM add_pad,attributes=no,x=$DR_text_x5,y=$DR_text_y5,symbol=$dateorder,polarity=$define_polarity,angle=$betang,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				endif
+				###蝕刻補償條碼###
+				if ($gROWlayer_type[$no] != 'solder_mask' && $gROWlayer_type[$no] != 'silk_screen') then
+					if ($gROWside[$no] == 'inner') then
+						set itp1='negative';set itp2='positive'
+						set cpr=`echo "($DATE12+6)*25.4" | $GBCF`
+					else
+						set itp1='positive';set itp2='negative'
+						set cpr=`echo "($DATE6+6)*25.4" | $GBCF`
+					endif
+					COM add_pad,attributes=no,x=$CP_text_x9,y=$CP_text_y9,symbol=rect20000x2700,polarity=$itp2,angle=$betang,mirror=$define_mirror,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					COM add_line,attributes=no,xs=$CP_text_x7,ys=$CP_text_y7,xe=$CP_text_x8,ye=$CP_text_y8,symbol=r$cpr,polarity=$itp1
+					COM filter_set,filter_name=histogram,update_popup=no,active=yes,feat_types=line,polarity=$itp1,include_syms=r$cpr,exclude_syms=,profile=all,dcode=
+					COM filter_area_strt
+					COM filter_area_end,layer=$gROWname[$no],filter_name=histogram,operation=select,area_type=none,inside_area=no,intersect_area=no,lines_only=no,ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+					COM sel_copy_repeat,$AA
+					COM add_text,attributes=no,type=string,x=$CP_text_x6,y=$CP_text_y6,text=6/6,x_size=1.27,y_size=1.27,w_factor=0.5,polarity=$itp1,angle=$betang,mirror=$define_mirror,fontname=standard
+				endif
+				###增加板厚等文字###
+				if ($gROWside[$no] == 'inner') then
+					COM add_pad,attributes=no,x=$CP_text_x10,y=$CP_text_y10,symbol=rect41000x2500,polarity=positive,angle=$betang,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+					if ($DATE13 !='') then
+						set cpa="Scale=$DATE13"
+					else
+						set cpa=''
+					endif
+					COM add_text,attributes=no,type=string,x=$CP_text_x11,y=$CP_text_y11,text=$DATE11 "CP="$DATE12"mils" $cpa,x_size=1.27,y_size=1.5,w_factor=0.6,polarity=$define_polarity,angle=$betang,mirror=$define_mirror,fontname=standard
+				else
+					COM add_text,attributes=no,type=string,x=$CP_text_x11,y=$CP_text_y11,text=$DUL_SIG$DUL_SIG$DD $DATE2 "CP="$DATE6"mils" "L/S="$DATE5"mils",x_size=1.27,y_size=1.5,w_factor=0.6,polarity=$define_polarity,angle=$betang,mirror=$define_mirror,fontname=standard
+				endif
+			endif
+			###底片及多層板共用檢查點###
+			##設定底片檢查點座標###
+			if (`echo "$int/2 < 8" | $GBCF`) then
+				set pho1=5000
+				set space_1=5
+				set pho_a1=1
+			else
+				set pho1=`echo "($int/2+2)*508+1676.4" | $GBCF`
+				set space_1=`echo "$pho1/1000" | $GBCF`
+				set pho_a1=0
+			endif
+			if ($short == 'short_x') then
+				set pho_x1=$pin_x10
+				set pho_x2=$pin_x11
+				set pho_y1=$basic_y2
+				set pho_y2=$basic_y1
+			else
+				set pho_x1=`echo "$pin_x11-$space_1" | $GBCF`
+				set pho_x2=$basic_x1
+				set pho_y1=$basic_y1
+				set pho_y2=`echo "$pin_y5-$space_1" | $GBCF`
+				if ($pho_a1 == 0) then
+					set pho_y1=`echo "($gSRymin-1.5)/2" | $GBCF`
+					set pho_x2=`echo "($gSRxmin-1.5)/2" | $GBCF`
+				endif
+			endif
+			###設定各層底片檢查點尺寸###
+			if ($gROWlayer_type[$no] != 'silk_screen' && $gROWname[$no] != 'li' && $gROWname[$no] != 'stupy') then	
+				if ($gROWside[$no] != 'inner') then
+					set in_polarity1='negative'
+					set in_polarity2='positive'
+					if ($gROWlayer_type[$no] == 'solder_mask') then
+						if ($gROWside[$no] == 'top') then
+							set out_side=1676.4
+						else
+							set out_side=1168.4
+						endif
+					else
+						if ($gROWside[$no] == 'top') then
+							set out_side=2184.4
+						else
+							set out_side=1676.4
+						endif
+					endif
+				else
+					set in_polarity1='positive'
+					set in_polarity2='negative'
+					if (`echo "$int/2+0.6 > $pho_a2" | $GBCF`) then
+						set out_side=`echo "$pho_a2*508+1676.4" | $GBCF`
+					else
+						set out_side=`echo "$out_side-508" | $GBCF`
+					endif
+					set pho_a2=`echo "$pho_a2+1" | $GBCF`
+				endif
+				set in_side=`echo "$out_side-406.4" | $GBCF`
+				set pho2=ths"$out_side"x"$in_side"x0x4x203.2
+				###增加各層底片檢查點###
+				COM add_pad,attributes=no,x=$pho_x1,y=$pho_y1,symbol=s$pho1,polarity=$in_polarity1,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$pho_x2,y=$pho_y2,symbol=s$pho1,polarity=$in_polarity1,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$pho_x1,y=$pho_y1,symbol=$pho2,polarity=$in_polarity2,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				COM add_pad,attributes=no,x=$pho_x2,y=$pho_y2,symbol=$pho2,polarity=$in_polarity2,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+				if (`echo "$pho1/1000 < $gSRxmin-1.5" | $GBCF` && $pho1 > 5000) then
+					set warn4=1
+				endif
+			endif
+		endif
+		if ($gROWname[$no] == 'drl' | $gROWlayer_type[$no] == 'solder_mask') then
+			set view_point=r`echo "$small_drill*25.4" | $GBCF`
+			if ($gROWlayer_type[$no] == 'solder_mask') then
+				set view_point=r`echo "($small_drill+10)*25.4" | $GBCF`
+			endif
+			COM add_pad,attributes=no,x=$pho_x1,y=$pho_y1,symbol=$view_point,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$pho_x2,y=$pho_y2,symbol=$view_point,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		endif
+		###極性轉換###
+		if ($gROWside[$no] == 'inner' && $gROWpolarity[$no] == 'positive') then
+			COM sel_invert
+		endif
+		if ($outsg == 1 | $tenting == 2) then
+			if ($gROWlayer_type[$no] == 'signal' && $gROWside[$no] == 'top' | $gROWside[$no] == 'bottom') then
+				COM sel_invert
+				set ch_invert='no'
+				set ch1_invert='yes'
+			endif
+		endif
+		###二鑽###
+		if ($gROWname[$no] == '2nd' && $gROWlayer_type[$no] == 'drill') then
+			COM add_pad,attributes=no,x=$pin_x3,y=$basic_y1,symbol=$symbol_x4,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$pin_x6,y=$basic_y1,symbol=$symbol_x6,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$pin_x1,y=$basic_y2,symbol=$symbol_x1,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+			COM add_pad,attributes=no,x=$pin_x6,y=$basic_y2,symbol=$symbol_x10,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		endif
+
+	endif
+###迴圈結束###
+end
+### 增加噴錫掛勾孔 ####
+COM display_layer,name=drl,display=yes,number=1
+COM work_layer,name=drl
+### 判斷是否有內層，有才加噴錫掛勾孔，也就是單雙面板不加噴錫掛勾孔 2015/05/22 ####
+if ($int != 0) then
+  if (`echo "$gSRymin > 6" | $GBCF`) then
+	COM add_pad,attributes=no,x=$pin_x7,y=$basic_y1,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+	COM add_pad,attributes=no,x=$pin_x7,y=$basic_y2,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+  endif
+  if (`echo "$gSRxmin > 6" | $GBCF`) then
+	COM add_pad,attributes=no,x=$basic_x1,y=$pin_y7,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+	COM add_pad,attributes=no,x=$basic_x2,y=$pin_y7,symbol=r3175,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+  endif
+endif
+### 六層板以上才加內層dount孔 2015/08/06 ####
+if ($int >= 4) then
+						COM add_pad,attributes=no,x=$dount_x8,y=$basic_y1,symbol=r949.96,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$dount_x8,y=$basic_y2,symbol=r949.96,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+						COM add_pad,attributes=no,x=$dount_x9,y=$basic_y1,symbol=r949.96,polarity=$define_polarity,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1						
+endif
+### 六層板以上才加四個孔 2015/07/23 ####
+set warn3=0		
+if ($int >= 4) then
+### 設定stupy層為工作層 2015/07/23 ####	
+	COM display_layer,name=stupy,display=yes,number=1
+	COM work_layer,name=stupy
+### 在stupy層加四個孔，再copy到鑽孔層 layer 2015/07/23 #### 
+	set ppt_x1=`echo "$gSRxmin-1.5" | $GBCF`
+	set ppt_x2=`echo "$gSRxmax+1.5" | $GBCF`
+	set ppt_y1=`echo "$gSRymin-1.5" | $GBCF`
+	set ppt_y2=`echo "$gSRymax+1.5" | $GBCF`
+	foreach DRL($DISCERN_DRL)
+		set drl_size=`echo "$DRL*25.4" | $GBCF`
+		COM add_pad,attributes=no,x=$ppt_x1,y=$ppt_y1,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=$ppt_x1,y=$ppt_y2,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+		COM add_pad,attributes=no,x=$ppt_x2,y=$ppt_y1,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+		COM add_pad,attributes=no,x=$ppt_x2,y=$ppt_y2,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1	
+	break
+	end	
+###將層複製到各層###
+### 外層加PAD，AR為6mil 2015/07/23 ####
+  if ($warn3 == 0) then
+	foreach ch($ch_drill)
+		COM affected_layer,name=$ch,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch_invert,dx=0,dy=0,size=355.6
+		COM affected_layer,name=$ch,mode=single,affected=no
+	end	
+### 內層加PAD，Power/ground加負的 2015/07/23 ####
+	foreach ch1($ch_power)
+		COM affected_layer,name=$ch1,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch_invert,dx=0,dy=0,size=355.6
+		COM affected_layer,name=$ch1,mode=single,affected=no
+	end
+### 內層加PAD，Mix加正的 2015/07/23 ####
+	foreach ch2($ch_mixed)
+		COM affected_layer,name=$ch2,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch1_invert,dx=0,dy=0,size=355.6
+		COM affected_layer,name=$ch2,mode=single,affected=no		
+	end
+### 鑽孔層加PAD 2015/07/23 ####	
+	COM affected_layer,name=drl,mode=single,affected=yes
+	COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,dx=0,dy=0,size=0
+	COM affected_layer,name=drl,mode=single,affected=no
+  endif
+endif
+
+### 增加檢驗孔 ####
+	###判斷X軸或Y軸###
+	if (`echo "$gSRxmin-3>$big_drl+2" | $GBCF`) then
+		set ch_2=`echo "$basic_y1+29" | $GBCF`
+		set drill_xy=y
+	else
+		set ch_1=`echo "$pin_x10+8" | $GBCF`
+		set drill_xy=x
+	endif
+	###設定已使用5個位置###
+set know_y1=`echo "$pin_y7 - 5" | $GBCF`
+set know_y2=`echo "$pin_y7 + 10" | $GBCF`
+set know_x3=`echo "$pin_x8-5" | $GBCF`
+set know_x4=`echo "$pin_x7-5" | $GBCF` 
+set know_x5=`echo "$pin_x9-5" | $GBCF`
+set LAST_DRL=0
+set ai_1=0
+set ai_2=0
+set warn3=0
+### 刪除stupy層所有物件 2015/07/23 ####	
+COM display_layer,name=stupy,display=yes,number=1
+COM work_layer,name=stupy
+COM sel_delete
+
+foreach DRL($DISCERN_DRL)
+	set drl_size=`echo "$DRL*25.4" | $GBCF`
+	set space=`echo "($drl_size+$LAST_DRL)/2000+1.2" | $GBCF`
+	if ($drill_xy == 'y') then
+		set ch_1=$basic_x1
+		set ch_2=`echo "$space+$ch_2" | $GBCF`
+		if (`echo "$gSRxmin-3-$ch_1 < $drl_size/2000" | $GBCF`) then
+			set ch_1=`echo "$gSRxmin-3-$drl_size/2000+0.5" | $GBCF`
+		endif
+		if (`echo "$ch_2 > $know_y1" | $GBCF`) then
+			if (`echo "$ch_2 < $know_y2" | $GBCF`) then
+				set ch_2=`echo "$ch_2+15" | $GBCF`
+			endif
+		endif
+		if (`echo "$ch_2 > $pin_y5-15" | $GBCF`) then
+			set warn3=1
+		endif
+	endif
+	if ($drill_xy == 'x') then
+		set ch_2=$basic_y1
+		set ch_1=`echo "$space+$ch_1" | $GBCF`
+		if (`echo "$gSRymin-3-$ch_2 < $drl_size/2000" | $GBCF`) then
+			set ch_2=`echo "$gSRymin-3-$drl_size/2000" | $GBCF`
+		endif
+		if (`echo "$ch_1 > $know_x3" | $GBCF`) then
+			if (`echo "$int > 0 && $ai_2 == 0" | $GBCF`) then
+				set ch_1=`echo "$ch_1+10" | $GBCF`
+				set ai_2=1
+			endif
+			if (`echo "$ch_1 > $know_x5 && $ai_2 == 1" | $GBCF`) then
+				set ch_1=`echo "$ch_1+10" | $GBCF`
+				set ai_2=2
+			endif
+			if (`echo "$ch_1 > $know_x4 && $ai_1 == 0" | $GBCF`) then
+				set ch_1=`echo "$ch_1+10" | $GBCF`
+				set ai_1=1
+			endif
+		endif
+		if (`echo "$ch_1 > $pin_x5-10" | $GBCF`) then
+			set warn3=1
+		endif
+	endif
+	COM add_pad,attributes=no,x=$ch_1,y=$ch_2,symbol=r$drl_size,polarity=positive,angle=0,mirror=no,nx=1,ny=1,dx=0,dy=0,xscale=1,yscale=1
+	set LAST_DRL=$drl_size
+end
+###將檢驗層複製到各層###
+### 外層檢驗孔加PAD，AR為8mil，與銅面間距為6mil 2015/05/22 ####
+if ($warn3 == 0) then
+	foreach ch($ch_drill)
+		COM affected_layer,name=$ch,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch_invert,dx=0,dy=0,size=711.2
+		#COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch_invert,dx=0,dy=0,size=406.4
+		COM affected_layer,name=$ch,mode=single,affected=no
+	end	
+### 內層檢驗孔加PAD，Power/ground加負的 2015/05/22 ####
+	foreach ch1($ch_power)
+		COM affected_layer,name=$ch1,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch_invert,dx=0,dy=0,size=711.2
+		COM affected_layer,name=$ch1,mode=single,affected=no
+	end
+### 內層檢驗孔加PAD，Mix加正的 2015/05/22 ####
+	foreach ch2($ch_mixed)
+		COM affected_layer,name=$ch2,mode=single,affected=yes
+		COM sel_copy_other,dest=affected_layers,target_layer=,invert=$ch1_invert,dx=0,dy=0,size=711.2
+		COM affected_layer,name=$ch2,mode=single,affected=no		
+	end
+	COM affected_layer,name=drl,mode=single,affected=yes
+	COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,dx=0,dy=0,size=0
+	COM affected_layer,name=drl,mode=single,affected=no
+endif
+if ($int > 2) then
+      COM display_layer,name=int1,display=yes,number=1
+      COM work_layer,name=int1
+      COM feat_hist_open,layer=int1,type=features
+      COM filter_set,filter_name=histogram,update_popup=no,active=yes,\
+      feat_types=pad,polarity=positive,include_syms=tg_3,exclude_syms=,\
+      profile=all,dcode=
+      COM filter_area_strt
+      COM filter_area_end,layer=int1,filter_name=histogram,operation=select,\
+      area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+      ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+      COM filter_set,filter_name=histogram,update_popup=no,active=yes,\
+      feat_types=pad,polarity=positive,include_syms=tg_3a,exclude_syms=,\
+      profile=all,dcode=
+      COM filter_area_strt
+      COM filter_area_end,layer=int1,filter_name=histogram,operation=select,\
+      area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+      ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+      COM sel_copy_other,dest=layer_name,target_layer=25.6-3,invert=no,\
+      dx=0,dy=0,size=0
+      COM feat_hist_close,layer=int1,type=features
+      COM display_layer,name=int1,display=no,number=1
+      COM display_layer,name=25.6-3,display=yes,number=1
+      COM work_layer,name=25.6-3
+      COM sel_change_sym,symbol=25.6-3,reset_angle=no
+      COM sel_break
+      endif
+### 取消stupy層為work layer 2015/05/22 ####
+	COM display_layer,name=stupy,display=no,number=1
+### 外層做invert 2015/05/22 ####	
+	foreach ch($ch_drill)
+		COM affected_layer,name=$ch,mode=single,affected=yes
+		COM sel_invert
+		COM affected_layer,name=$ch,mode=single,affected=no
+	end		
+###警告視窗###
+if ($warn_gui_language == 'yes' | $warn3 != 0 | $warn4 != 0) then
+	set warn2="/tmp/warn2"
+	echo "WIN 200 200">>$warn2
+	echo "FONT tbi24">>$warn2
+	echo "BG 999999">>$warn2
+	echo "FG 990000">>$warn2
+	echo "LABEL Warning">>$warn2
+	if ($warn4 == 0) then
+		echo "LABEL Work_Size Too Small">>$warn2
+		if ($warn3 == 1) then
+			echo "LABEL Please Check Stup_Layers and">>$warn2
+		endif
+		echo "LABEL Please Check Ever_Layers">>$warn2
+	else
+		echo "LABEL Please check View_Point">>$warn2
+	endif
+	echo "END">>$warn2
+	gui $warn2
+	\rm $warn2
+endif
+###刪除gui-two輸出檔案###
+END:
+\rm $info_drl
+\rm $tmp_drill
+\rm $tmp_drl_sort
+\rm $tmp_drl_ans
+\rm $single_1
+### 刪除 power_1$$ & mixed_1$$ 暫存檔2015/05/22 ####	
+\rm $power_1
+\rm $mixed_1
+exit
+
+
+

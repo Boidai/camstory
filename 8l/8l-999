@@ -1,0 +1,51 @@
+COM affected_layer,name=int1,mode=single,affected=yes
+COM affected_layer,name=int2,mode=single,affected=yes
+COM affected_layer,name=int3,mode=single,affected=yes
+COM affected_layer,name=int4,mode=single,affected=yes
+COM affected_layer,name=int5,mode=single,affected=yes
+COM affected_layer,name=int6,mode=single,affected=yes
+COM display_layer,name=int1,display=yes,number=1
+COM work_layer,name=int1
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface\;arc
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;pad
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line
+COM filter_set,filter_name=popup,update_popup=no,include_syms=r63
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=unselect,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_delete
+COM filter_set,filter_name=popup,update_popup=no,include_syms=
+COM filter_set,filter_name=popup,update_popup=no,feat_types=line\;surface
+COM filter_set,filter_name=popup,update_popup=no,feat_types=surface
+COM filter_set,filter_name=popup,update_popup=no,polarity=
+COM filter_set,filter_name=popup,update_popup=no,polarity=negative
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_invert
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive\;negative
+COM filter_set,filter_name=popup,update_popup=no,polarity=positive
+COM filter_area_strt
+COM filter_area_end,layer=,filter_name=popup,operation=select,\
+area_type=none,inside_area=no,intersect_area=no,lines_only=no,\
+ovals_only=no,min_len=0,max_len=0,min_angle=0,max_angle=0
+COM sel_resize_surface,island_size=-230,hole_size=-230,drill_filter=no,\
+corner_ctl=no
+COM filter_reset,filter_name=popup
+COM display_layer,name=int1,display=no,number=1
+COM display_layer,name=stupy,display=yes,number=1
+COM work_layer,name=stupy
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=yes,\
+dx=0,dy=0,size=40
+COM sel_copy_other,dest=affected_layers,target_layer=,invert=no,\
+dx=0,dy=0,size=14
+COM display_layer,name=stupy,display=no,number=1
+COM affected_layer,name=int6,mode=all,affected=no

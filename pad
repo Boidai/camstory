@@ -1,0 +1,5 @@
+COM chklist_single,action=valor_cleanup_ref_subst,show=yes
+COM chklist_cupd,chklist=valor_cleanup_ref_subst,nact=1,params=((pp_layer=.affected)(pp_in_selected=All)(pp_tol=0.1)(pp_rot_mode=ALL)(pp_connected=Yes)(pp_work=Features)),\
+mode=regular
+COM chklist_run,chklist=valor_cleanup_ref_subst,nact=1,area=profile
+COM chklist_close,chklist=valor_cleanup_ref_subst,mode=hide
